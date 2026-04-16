@@ -1,0 +1,12 @@
+{
+  "name": "@hyperscale/sessions",
+  "version": "0.1.0",
+  "private": true,
+  "main": "./src/index.ts",
+  "types": "./src/index.ts",
+  "dependencies": {
+    "@hyperscale/database": "workspace:*",
+    "otplib": "^12.0.1",
+    "pino": "^9.6.0"
+  }
+}

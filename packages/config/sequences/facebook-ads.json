@@ -1,0 +1,32 @@
+[
+  {
+    "step": 1,
+    "delay_days": 0,
+    "subject": "{{firstName}}, quick question about your {{leadMagnet}}",
+    "body": "Hey {{firstName}},\n\nI just came across your {{leadMagnet}} and it got me thinking - can people find it outside of Facebook?\n\nWe help coaches and course creators get their programs in front of their ideal audience using YouTube Ads. The cool thing is, your existing funnel likely already works - we just plug into a new traffic source.\n\nWould you be open to a quick 15-min chat to see if it'd be a fit?\n\nBest,\nAlex\nHyperscale Labs"
+  },
+  {
+    "step": 2,
+    "delay_days": 3,
+    "subject": "Re: {{firstName}}, quick question about your {{leadMagnet}}",
+    "body": "Hey {{firstName}},\n\nJust bumping this up in case it got buried.\n\nMost coaches I talk to are running Facebook Ads and doing well - but they've never tested YouTube. The traffic is cheaper, the intent is higher, and your existing funnel doesn't need to change.\n\nWorth a 15-min call to see if it makes sense for you?\n\nBest,\nAlex\nHyperscale Labs"
+  },
+  {
+    "step": 3,
+    "delay_days": 4,
+    "subject": "Thought this might help, {{firstName}}",
+    "body": "Hey {{firstName}},\n\nI was looking at a few coaching funnels this week and noticed a pattern - the ones scaling fastest are all diversifying beyond Facebook Ads into YouTube.\n\nThe reason is simple: YouTube viewers are actively searching for solutions. They're further along in the buying journey than someone scrolling Facebook.\n\nI have a couple of ideas specific to your space. Want me to share them?\n\nBest,\nAlex\nHyperscale Labs"
+  },
+  {
+    "step": 4,
+    "delay_days": 5,
+    "subject": "One last idea for you, {{firstName}}",
+    "body": "Hey {{firstName}},\n\nI'll keep this short. I put together a breakdown of what top-performing coaching funnels are doing with YouTube Ads right now.\n\nHappy to send it over - no strings attached.\n\nIf the timing isn't right, totally get it. Just let me know either way.\n\nBest,\nAlex\nHyperscale Labs"
+  },
+  {
+    "step": 5,
+    "delay_days": 7,
+    "subject": "Closing the loop",
+    "body": "Hey {{firstName}},\n\nI've reached out a few times and haven't heard back, so I'll take the hint.\n\nIf things change down the road and you want to explore YouTube Ads as a new traffic source for your coaching business, I'm around.\n\nWishing you all the best.\n\nAlex\nHyperscale Labs"
+  }
+]

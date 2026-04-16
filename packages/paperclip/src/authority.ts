@@ -1,0 +1,40 @@
+export const AUTHORITY_MATRIX = {
+  'retry_failed_job': { level: 'autonomous', requiresConfirmation: false },
+  'requeue_dlq_items': { level: 'autonomous', requiresConfirmation: false },
+  'enable_disable_keyword': { level: 'autonomous', requiresConfirmation: false },
+  'add_new_keyword': { level: 'autonomous', requiresConfirmation: false },
+  'acknowledge_non_critical_alert': { level: 'autonomous', requiresConfirmation: false },
+  'switch_source_tier': { level: 'autonomous_with_confirmation', confirmationWindowHours: 24 },
+  'increase_provider_budget': { level: 'recommend_only', requiresHumanApproval: true },
+  'pause_campaign': { level: 'autonomous_pause_only', canResume: false },
+  'reauthenticate_session': { level: 'autonomous', requiresConfirmation: false },
+  'respond_to_positive_reply': { level: 'never', draftsOnly: true },
+  'modify_personalization_prompts': { level: 'autonomous_ab_test', canPromoteWinners: true },
+  'change_icp_criteria': { level: 'recommend_only', requiresHumanApproval: true },
+  'disable_provider_permanently': { level: 'recommend_only', requiresHumanApproval: true },
+} as const;
+
+export type AuthorityAction = keyof typeof AUTHORITY_MATRIX;
+
+type AuthorityLevel = (typeof AUTHORITY_MATRIX)[AuthorityAction]['level'];
+
+const AUTONOMOUS_LEVELS: Set<string> = new Set([
+  'autonomous',
+  'autonomous_with_confirmation',
+  'autonomous_pause_only',
+  'autonomous_ab_test',
+]);
+
+export function canActAutonomously(action: AuthorityAction): boolean {
+  return AUTONOMOUS_LEVELS.has(AUTHORITY_MATRIX[action].level);
+}
+
+export function requiresConfirmation(action: AuthorityAction): boolean {
+  const rule = AUTHORITY_MATRIX[action];
+  return 'confirmationWindowHours' in rule;
+}
+
+export function requiresHumanApproval(action: AuthorityAction): boolean {
+  const rule = AUTHORITY_MATRIX[action];
+  return 'requiresHumanApproval' in rule && (rule as any).requiresHumanApproval === true;
+}

@@ -1,0 +1,15 @@
+{
+  "name": "@hyperscale/remediation",
+  "version": "0.1.0",
+  "private": true,
+  "main": "./src/index.ts",
+  "types": "./src/index.ts",
+  "dependencies": {
+    "@hyperscale/database": "workspace:*",
+    "@hyperscale/types": "workspace:*",
+    "@hyperscale/exa": "workspace:*",
+    "@hyperscale/paperclip": "workspace:*",
+    "@hyperscale/sessions": "workspace:*",
+    "pino": "^9.6.0"
+  }
+}

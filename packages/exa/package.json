@@ -1,0 +1,12 @@
+{
+  "name": "@hyperscale/exa",
+  "version": "0.1.0",
+  "private": true,
+  "main": "./src/index.ts",
+  "types": "./src/index.ts",
+  "dependencies": {
+    "exa-js": "^1.4.0",
+    "@hyperscale/database": "workspace:*",
+    "pino": "^9.6.0"
+  }
+}

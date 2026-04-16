@@ -1,0 +1,26 @@
+{
+  "name": "hyperscale-leads",
+  "private": true,
+  "packageManager": "pnpm@10.32.1",
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "scripts": {
+    "dev": "turbo run dev",
+    "build": "turbo run build",
+    "lint": "turbo run lint",
+    "test": "turbo run test",
+    "phase0:import": "turbo run phase0:import --filter=@hyperscale-leads/api",
+    "db:migrate": "pnpm --filter @hyperscale-leads/database run migrate",
+    "db:seed": "pnpm --filter @hyperscale-leads/database run seed"
+  },
+  "devDependencies": {
+    "@types/node": "^22.19.17",
+    "eslint": "^10.2.0",
+    "prettier": "^3.8.3",
+    "turbo": "^2.9.5",
+    "typescript": "^6.0.2",
+    "vitest": "^4.1.4"
+  }
+}

@@ -1,0 +1,398 @@
+generator client {
+  provider        = "prisma-client-js"
+  previewFeatures = ["postgresqlExtensions"]
+}
+
+datasource db {
+  provider   = "postgresql"
+  url        = env("DATABASE_URL")
+  extensions = [pg_trgm, pgvector(map: "vector")]
+}
+
+enum Source {
+  FACEBOOK_ADS
+  INSTAGRAM
+  MANUAL_IMPORT
+}
+
+enum SourceTier {
+  TIER_1_API
+  TIER_2_MANAGED
+  TIER_3_INHOUSE
+}
+
+enum LeadStatus {
+  RAW
+  DEDUPING
+  DEDUPED_UNIQUE
+  DEDUPED_DUPLICATE
+  ENRICHING
+  ENRICHED
+  SCORING
+  SCORED_PASS
+  SCORED_FAIL
+  VALIDATING
+  NB_PASSED
+  VALIDATED_VALID
+  VALIDATED_INVALID
+  PERSONALIZING
+  REVIEW_PENDING
+  READY_TO_UPLOAD
+  UPLOADED
+  REPLIED
+  BOOKED
+  AUTO_REMEDIATING
+  ESCALATED
+  ERROR
+}
+
+enum EmailValidationResult {
+  VALID
+  INVALID
+  CATCH_ALL
+  UNKNOWN
+  DO_NOT_MAIL_ROLE_BASED
+  DO_NOT_MAIL_OTHER
+}
+
+enum ReplyClassification {
+  DIRECT_INTEREST
+  INTEREST_OBJECTION
+  NOT_INTERESTED
+  OUT_OF_OFFICE
+  UNSUBSCRIBE
+  AGGRESSIVE
+  NOT_CLASSIFIED
+}
+
+enum RemediationStatus {
+  PENDING
+  IN_PROGRESS
+  SUCCEEDED
+  FAILED
+  ESCALATED
+}
+
+model Lead {
+  id                    String   @id @default(cuid())
+  source                Source
+  sourceTier            SourceTier?
+  status                LeadStatus @default(RAW)
+
+  companyName           String
+  companyNameNormalized String
+  firstName             String?
+  fullName              String?
+  title                 String?
+  email                 String?  @unique
+  emailRoot             String?
+  alternateEmails       Json?
+
+  sourceUrl             String
+  sourceHandle          String?
+  adCreativeId          String?
+  landingPageUrl        String?
+  leadMagnetType        String?
+  leadMagnetDescription String?
+
+  websiteUrl            String?
+  linkedinUrl           String?
+  instagramUrl          String?
+  facebookUrl           String?
+  phoneNumber           String?
+  country               String?
+  employeeCount         Int?
+  employeeCountSource   String?
+
+  icpScore              Int?
+  icpPass               Boolean?
+  icpReasoning          Json?
+  icpScoredAt           DateTime?
+  exaContext             Json?
+
+  duplicateOfId         String?
+  duplicateOf           Lead?    @relation("Duplicates", fields: [duplicateOfId], references: [id])
+  duplicates            Lead[]   @relation("Duplicates")
+
+  neverbounceResult     EmailValidationResult?
+  zerobounceResult      EmailValidationResult?
+  zerobounceSubStatus   String?
+  validatedAt           DateTime?
+
+  personalization       Json?
+  personalizedAt        DateTime?
+
+  instantlyCampaignId   String?
+  instantlyLeadId       String?
+  uploadedAt            DateTime?
+
+  emailSent             Boolean  @default(false)
+  emailOpened           Boolean  @default(false)
+  emailReplied          Boolean  @default(false)
+  replyText             String?
+  replyClassification   ReplyClassification?
+  replyClassifiedAt     DateTime?
+  meetingBooked         Boolean  @default(false)
+  meetingBookedAt       DateTime?
+
+  isRoleBasedEmail      Boolean  @default(false)
+
+  remediations          Remediation[]
+  keywordId             String?
+  keyword               Keyword? @relation(fields: [keywordId], references: [id])
+
+  createdAt             DateTime @default(now())
+  scrapedAt             DateTime @default(now())
+  updatedAt             DateTime @updatedAt
+  errorLog              Json?
+
+  @@index([source, status])
+  @@index([companyNameNormalized])
+  @@index([emailRoot])
+  @@index([icpScore])
+}
+
+model Remediation {
+  id            String            @id @default(cuid())
+  leadId        String?
+  lead          Lead?             @relation(fields: [leadId], references: [id])
+  trigger       String
+  strategy      String
+  status        RemediationStatus
+  attempts      Int               @default(0)
+  maxAttempts   Int               @default(3)
+  actor         String
+  reasoning     String?
+  result        Json?
+  escalatedTo   String?
+  createdAt     DateTime          @default(now())
+  completedAt   DateTime?
+
+  @@index([status, trigger])
+}
+
+model ScrapeJob {
+  id            String    @id @default(cuid())
+  source        Source
+  sourceTier    SourceTier
+  keyword       String
+  country       String?
+  status        String
+  leadsFound    Int       @default(0)
+  leadsAdded    Int       @default(0)
+  costUsd       Float     @default(0)
+  externalJobId String?
+  externalJobUrl String?
+  startedAt     DateTime?
+  finishedAt    DateTime?
+  errorLog      String?
+  createdAt     DateTime  @default(now())
+}
+
+model Keyword {
+  id            String    @id @default(cuid())
+  primary       String
+  secondary     String?
+  source        Source
+  enabled       Boolean   @default(true)
+  lastUsedAt    DateTime?
+  totalYield    Int       @default(0)
+  icpPassRate   Float     @default(0)
+  bookingYield  Int       @default(0)
+  score         Float     @default(1.0)
+  discoveredBy  String    @default("manual")
+  discoveredAt  DateTime  @default(now())
+  leads         Lead[]
+}
+
+model Campaign {
+  id                  String    @id @default(cuid())
+  name                String
+  source              Source
+  instantlyCampaignId String?   @unique
+  dailySendTarget     Int       @default(500)
+  active              Boolean   @default(true)
+  sequenceTemplate    Json?
+  lastHealthCheckAt   DateTime?
+  inboxes             Inbox[]
+}
+
+model SessionCredential {
+  id                String    @id @default(cuid())
+  service           String
+  account           String
+  encryptedCookies  Bytes?
+  encryptedUsername  Bytes?
+  encryptedPassword Bytes?
+  totpSecret        Bytes?
+  phoneNumber       String?
+  status            String    @default("active")
+  lastUsedAt        DateTime?
+  lastHealthCheckAt DateTime?
+  lastReauthAt      DateTime?
+  failureCount      Int       @default(0)
+  notes             String?
+}
+
+model EmailValidationCache {
+  email       String                 @id
+  neverbounce EmailValidationResult?
+  zerobounce  EmailValidationResult?
+  subStatus   String?
+  validatedAt DateTime               @default(now())
+}
+
+model ApiCache {
+  key       String   @id
+  response  Json
+  createdAt DateTime @default(now())
+  expiresAt DateTime
+  @@index([expiresAt])
+}
+
+model ExaSearchCache {
+  queryHash  String   @id
+  query      String
+  searchType String
+  results    Json
+  createdAt  DateTime @default(now())
+  expiresAt  DateTime
+}
+
+model SourceConfig {
+  source         Source     @id
+  activeTier     SourceTier
+  tier1Config    Json?
+  tier2Config    Json?
+  tier3Config    Json?
+  autoTierSwitch Boolean   @default(true)
+  tierHealth     Json?
+  updatedAt      DateTime  @updatedAt
+}
+
+model PaperclipAction {
+  id            String   @id @default(cuid())
+  category      String
+  action        String
+  reasoning     String
+  inputContext   Json
+  outputResult  Json
+  humanFeedback String?
+  performedAt   DateTime @default(now())
+  @@index([category, performedAt])
+}
+
+model DailyStats {
+  id                   String   @id @default(cuid())
+  date                 DateTime @unique @db.Date
+  leadsScraped         Int      @default(0)
+  leadsEnriched        Int      @default(0)
+  leadsPassedIcp       Int      @default(0)
+  leadsValidated       Int      @default(0)
+  leadsUploaded        Int      @default(0)
+  leadsReplied         Int      @default(0)
+  leadsBooked          Int      @default(0)
+  fbLeads              Int      @default(0)
+  igLeads              Int      @default(0)
+  apifyCostUsd         Float    @default(0)
+  phantombusterCostUsd Float    @default(0)
+  enrichmentCostUsd    Float    @default(0)
+  validationCostUsd    Float    @default(0)
+  llmCostUsd           Float    @default(0)
+  exaCostUsd           Float    @default(0)
+  totalCostUsd         Float    @default(0)
+  remediationsRun      Int      @default(0)
+  escalationsToHuman   Int      @default(0)
+}
+
+model Budget {
+  id              String   @id @default(cuid())
+  provider        String   @unique
+  monthlyCapUsd   Float
+  alertAt80Pct    Boolean  @default(true)
+  hardStopAt100   Boolean  @default(true)
+  currentUsageUsd Float    @default(0)
+  monthResetAt    DateTime
+  autoSwitchTo    String?
+}
+
+model Alert {
+  id          String    @id @default(cuid())
+  severity    String
+  category    String
+  title       String
+  description String
+  actionTaken String?
+  context     Json
+  acknowledged Boolean  @default(false)
+  resolvedAt  DateTime?
+  createdAt   DateTime  @default(now())
+  @@index([acknowledged, severity])
+}
+
+enum DomainHealthStatus {
+  HEALTHY
+  DEGRADED
+  BLACKLISTED
+  BURNED
+}
+
+enum DomainReputation {
+  HIGH
+  MEDIUM
+  LOW
+  UNKNOWN
+}
+
+enum InboxStatus {
+  WARMING
+  STANDBY
+  ACTIVE
+  ROTATED_OUT
+  BURNED
+}
+
+model Domain {
+  id                  String              @id @default(cuid())
+  domain              String              @unique
+  provider            String?
+  redirectUrl         String?
+  healthStatus        DomainHealthStatus  @default(HEALTHY)
+  dkimOk             Boolean             @default(false)
+  spfOk              Boolean             @default(false)
+  dmarcOk            Boolean             @default(false)
+  reputation         DomainReputation    @default(UNKNOWN)
+  blacklistTempCount Int                 @default(0)
+  blacklistPermCount Int                 @default(0)
+  lastDnsCheck       DateTime?
+  lastBlacklistCheck DateTime?
+  lastReputationCheck DateTime?
+  warmupEmailsSent   Int                 @default(0)
+  inboxes            Inbox[]
+  createdAt          DateTime            @default(now())
+  updatedAt          DateTime            @updatedAt
+
+  @@index([healthStatus])
+}
+
+model Inbox {
+  id                 String       @id @default(cuid())
+  domainId           String
+  domain             Domain       @relation(fields: [domainId], references: [id])
+  email              String       @unique
+  persona            String?
+  handler            String?
+  status             InboxStatus  @default(WARMING)
+  campaignId         String?
+  campaign           Campaign?    @relation(fields: [campaignId], references: [id])
+  dailyCampaignLimit Int          @default(20)
+  warmupCap          Int          @default(10)
+  warmupIncrement    Int          @default(2)
+  replyRate          Int          @default(30)
+  warmupEmailsSent   Int          @default(0)
+  connectedAt        DateTime?
+  createdAt          DateTime     @default(now())
+  updatedAt          DateTime     @updatedAt
+
+  @@index([status, campaignId])
+}
