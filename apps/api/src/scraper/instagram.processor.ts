@@ -6,6 +6,7 @@ import { QueueService } from '../queues/queue.service';
 import { createLogger } from '../common/logger';
 
 const logger = createLogger('instagram-processor');
+const SCRAPE_ONLY = process.env.SCRAPE_ONLY === 'true';
 
 interface InstagramJobData {
   keyword: string;
@@ -24,6 +25,9 @@ export class InstagramProcessor extends WorkerHost {
   async process(job: Job<InstagramJobData>): Promise<any> {
     const { keyword, maxResults = 100 } = job.data;
     logger.info({ jobId: job.id, keyword, maxResults }, 'Processing Instagram scrape job');
+    if (SCRAPE_ONLY) {
+      logger.warn({ jobId: job.id }, 'SCRAPE_ONLY=true — will skip downstream pipeline enqueue');
+    }
 
     const scrapeJob = await prisma.scrapeJob.create({
       data: {
@@ -48,8 +52,15 @@ export class InstagramProcessor extends WorkerHost {
         select: { id: true },
       });
 
-      for (const lead of createdLeads) {
-        await this.queueService.addJob('dedup', { leadId: lead.id });
+      if (SCRAPE_ONLY) {
+        logger.info(
+          { jobId: job.id, leads: createdLeads.length },
+          'SCRAPE_ONLY=true — skipping enqueue to dedup queue',
+        );
+      } else {
+        for (const lead of createdLeads) {
+          await this.queueService.addJob('dedup', { leadId: lead.id });
+        }
       }
 
       await prisma.scrapeJob.update({

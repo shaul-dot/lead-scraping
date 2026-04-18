@@ -6,6 +6,7 @@ import { createLogger } from '../common/logger';
 import { getActiveFacebookAdapter } from '@hyperscale/adapters';
 
 const logger = createLogger('facebook-ads-processor');
+const SCRAPE_ONLY = process.env.SCRAPE_ONLY === 'true';
 
 interface FacebookAdsJobData {
   keyword: string;
@@ -25,6 +26,12 @@ export class FacebookAdsProcessor extends WorkerHost {
       { jobId: job.id, keyword, maxResults, country },
       'Processing Facebook Ads scrape job',
     );
+    if (SCRAPE_ONLY) {
+      logger.warn(
+        { jobId: job.id },
+        'SCRAPE_ONLY=true — will skip downstream pipeline enqueue',
+      );
+    }
 
     const adapter = await getActiveFacebookAdapter();
 
@@ -79,7 +86,14 @@ export class FacebookAdsProcessor extends WorkerHost {
           },
         });
 
-        await this.queueService.addJob('dedup', { leadId: newLead.id });
+        if (SCRAPE_ONLY) {
+          logger.info(
+            { leadId: newLead.id, sourceHandle: lead.sourceHandle },
+            'SCRAPE_ONLY=true — skipping enqueue to dedup queue',
+          );
+        } else {
+          await this.queueService.addJob('dedup', { leadId: newLead.id });
+        }
         created++;
       } catch (err) {
         logger.error(
