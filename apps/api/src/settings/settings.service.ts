@@ -13,6 +13,7 @@ interface ProviderConfig {
   testBody?: Record<string, unknown>;
   authStyle: 'bearer' | 'query' | 'header-key' | 'path-token';
   authParam?: string;
+  extraHeaders?: Record<string, string>;
 }
 
 const PROVIDERS: ProviderConfig[] = [
@@ -30,7 +31,7 @@ const PROVIDERS: ProviderConfig[] = [
     testUrl: 'https://api.bounceban.com/v1/account',
     testMethod: 'GET',
     authStyle: 'header-key',
-    authParam: 'x-api-key',
+    authParam: 'Authorization',
   },
   {
     name: 'instantly',
@@ -45,12 +46,15 @@ const PROVIDERS: ProviderConfig[] = [
     testUrl: 'https://api.anthropic.com/v1/messages',
     testMethod: 'POST',
     testBody: {
-      model: 'claude-3-haiku-20240307',
+      model: 'claude-haiku-4-5',
       max_tokens: 1,
       messages: [{ role: 'user', content: 'ping' }],
     },
     authStyle: 'header-key',
     authParam: 'x-api-key',
+    extraHeaders: {
+      'anthropic-version': '2023-06-01',
+    },
   },
   {
     name: 'apollo',
@@ -247,6 +251,10 @@ export class SettingsService {
         case 'path-token':
           url = url.replace('{token}', encodeURIComponent(apiKey));
           break;
+      }
+
+      if (providerConfig.extraHeaders) {
+        Object.assign(headers, providerConfig.extraHeaders);
       }
 
       const init: RequestInit = {
