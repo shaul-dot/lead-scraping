@@ -4,7 +4,7 @@
   "private": true,
   "scripts": {
     "build": "nest build",
-    "dev": "node -r @swc-node/register src/main.ts",
+    "dev": "node --env-file=../../.env -r @swc-node/register src/main.ts",
     "start": "node dist/main",
     "start:prod": "node dist/main"
   },

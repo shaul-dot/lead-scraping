@@ -11,9 +11,9 @@
     "build": "turbo run build",
     "lint": "turbo run lint",
     "test": "turbo run test",
-    "phase0:import": "turbo run phase0:import --filter=@hyperscale-leads/api",
-    "db:migrate": "pnpm --filter @hyperscale-leads/database run migrate",
-    "db:seed": "pnpm --filter @hyperscale-leads/database run seed"
+    "phase0:import": "turbo run phase0:import --filter=@hyperscale/api",
+    "db:migrate": "pnpm --filter @hyperscale/database run migrate",
+    "db:seed": "pnpm --filter @hyperscale/database run seed"
   },
   "pnpm": {
     "onlyBuiltDependencies": [
