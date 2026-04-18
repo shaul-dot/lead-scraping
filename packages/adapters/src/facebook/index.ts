@@ -1,10 +1,13 @@
 import { prisma } from '@hyperscale/database';
 import type { BaseAdapter } from '../base';
 import { FacebookTier1Adapter } from './tier1';
+import { FacebookApifyCuriousCoderAdapter } from './facebook-apify-curious-coder.adapter';
 import { FacebookTier2Adapter } from './tier2';
 import { FacebookTier3Adapter } from './tier3';
 
 export { FacebookTier1Adapter } from './tier1';
+export { FacebookApifyAdapter, type ApifyAdResult } from './facebook-apify-adapter';
+export { FacebookApifyCuriousCoderAdapter } from './facebook-apify-curious-coder.adapter';
 export { FacebookTier2Adapter } from './tier2';
 export { FacebookTier3Adapter } from './tier3';
 export { qualifyAd, type RawFacebookAd, type QualificationResult } from './qualify';
@@ -21,6 +24,6 @@ export async function getActiveFacebookAdapter(): Promise<BaseAdapter> {
       return new FacebookTier3Adapter();
     case 'TIER_2_MANAGED':
     default:
-      return new FacebookTier2Adapter();
+      return new FacebookApifyCuriousCoderAdapter();
   }
 }
