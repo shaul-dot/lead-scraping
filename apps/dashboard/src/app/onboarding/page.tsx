@@ -26,6 +26,7 @@ import {
   Mail,
   Search,
   Shield,
+  Workflow,
   Zap,
   Users,
   Play,
@@ -38,11 +39,16 @@ const STEPS = [
   { key: 'schedule', label: 'Launch', icon: Rocket, description: 'Set schedule & start' },
 ] as const;
 
-const REQUIRED_PROVIDERS = ['meta', 'instantly', 'anthropic'];
+/** Fallback if onboarding-status omits requiredProviders (must stay aligned with API). */
+const FALLBACK_REQUIRED_PROVIDERS = ['apify', 'instantly', 'anthropic'] as const;
 const RECOMMENDED_PROVIDERS = ['neverbounce', 'bounceban', 'exa'];
 
 const providerMeta: Record<string, { label: string; icon: React.ReactNode; description: string }> = {
-  meta: { label: 'Meta (Facebook)', icon: <Share2 className="h-4 w-4" />, description: 'Required for Facebook Ads scraping' },
+  apify: {
+    label: 'Apify',
+    icon: <Workflow className="h-4 w-4" />,
+    description: 'Required for web scraping & data extraction',
+  },
   instantly: { label: 'Instantly', icon: <Mail className="h-4 w-4" />, description: 'Required for email sending & campaign management' },
   anthropic: { label: 'Anthropic', icon: <Bot className="h-4 w-4" />, description: 'Required for AI-powered personalization & scoring' },
   neverbounce: { label: 'NeverBounce', icon: <Mail className="h-4 w-4" />, description: 'Recommended for primary email validation' },
@@ -199,16 +205,24 @@ function ProviderSetupRow({ provider, isRequired }: { provider: ProviderInfo; is
   );
 }
 
-function StepApiKeys({ providers, onCanProceed }: { providers: ProviderInfo[]; onCanProceed: (ok: boolean) => void }) {
-  const requiredConfigured = REQUIRED_PROVIDERS.every((name) =>
+function StepApiKeys({
+  providers,
+  requiredProviderNames,
+  onCanProceed,
+}: {
+  providers: ProviderInfo[];
+  requiredProviderNames: readonly string[];
+  onCanProceed: (ok: boolean) => void;
+}) {
+  const requiredConfigured = requiredProviderNames.every((name) =>
     providers.find((p) => p.name === name)?.configured,
   );
 
   useEffect(() => {
     onCanProceed(requiredConfigured);
-  }, [requiredConfigured, onCanProceed]);
+  }, [requiredConfigured, onCanProceed, requiredProviderNames]);
 
-  const requiredProviders = providers.filter((p) => REQUIRED_PROVIDERS.includes(p.name));
+  const requiredProviders = providers.filter((p) => requiredProviderNames.includes(p.name));
   const recommendedProviders = providers.filter((p) => RECOMMENDED_PROVIDERS.includes(p.name));
 
   return (
@@ -216,7 +230,8 @@ function StepApiKeys({ providers, onCanProceed }: { providers: ProviderInfo[]; o
       <div>
         <h3 className="text-base font-semibold text-text-primary">Required API Keys</h3>
         <p className="mt-1 text-sm text-text-muted">
-          These services are essential for the pipeline to function. Configure all three to continue.
+          These services are essential for the pipeline to function. Configure all{' '}
+          {requiredProviderNames.length} required services to continue.
         </p>
       </div>
       <div className="space-y-3">
@@ -623,6 +638,15 @@ export default function OnboardingPage() {
     ? (providersQuery.data as ProviderInfo[])
     : [];
 
+  const onboarding = onboardingQuery.data as
+    | { steps?: { apiKeys?: { requiredProviders?: string[] } } }
+    | undefined;
+  const fromApi = onboarding?.steps?.apiKeys?.requiredProviders;
+  const requiredProviderNames: readonly string[] =
+    Array.isArray(fromApi) && fromApi.length > 0 && fromApi.every((n) => typeof n === 'string')
+      ? fromApi
+      : [...FALLBACK_REQUIRED_PROVIDERS];
+
   if (onboardingQuery.isLoading || providersQuery.isLoading) {
     return (
       <div className="flex items-center justify-center min-h-[60vh]">
@@ -682,7 +706,11 @@ export default function OnboardingPage() {
         </div>
 
         {currentStep === 0 && (
-          <StepApiKeys providers={providers} onCanProceed={setCanProceed} />
+          <StepApiKeys
+            providers={providers}
+            requiredProviderNames={requiredProviderNames}
+            onCanProceed={setCanProceed}
+          />
         )}
         {currentStep === 1 && (
           <StepKeywords onCanProceed={setCanProceed} />

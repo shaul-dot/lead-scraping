@@ -162,18 +162,20 @@ export const MOCK_RESPONSES: Record<string, unknown> = {
   '/api/manual-review': [],
 
   '/api/settings': [
-    { provider: 'meta', label: 'Meta (Facebook)', configured: true, masked: '●●●●a4f2', status: 'connected', category: 'Social Platforms' },
-    { provider: 'instantly', label: 'Instantly', configured: true, masked: '●●●●x9k1', status: 'connected', category: 'Email Infrastructure' },
-    { provider: 'anthropic', label: 'Anthropic (Claude)', configured: true, masked: '●●●●m7p3', status: 'connected', category: 'AI & Search' },
-    { provider: 'neverbounce', label: 'NeverBounce', configured: true, masked: '●●●●b2j8', status: 'connected', category: 'Email Validation' },
-    { provider: 'bounceban', label: 'BounceBan', configured: true, masked: '●●●●c5n4', status: 'connected', category: 'Email Validation' },
-    { provider: 'exa', label: 'Exa Search', configured: true, masked: '●●●●d1r6', status: 'connected', category: 'AI & Search' },
-    { provider: 'apollo', label: 'Apollo.io', configured: false, masked: '', status: 'not_configured', category: 'Lead Enrichment' },
-    { provider: 'snovio', label: 'Snov.io', configured: false, masked: '', status: 'not_configured', category: 'Lead Enrichment' },
-    { provider: 'lusha', label: 'Lusha', configured: false, masked: '', status: 'not_configured', category: 'Lead Enrichment' },
-    { provider: 'getprospect', label: 'GetProspect', configured: false, masked: '', status: 'not_configured', category: 'Lead Enrichment' },
-    { provider: 'hetrixtools', label: 'HetrixTools', configured: false, masked: '', status: 'not_configured', category: 'Deliverability' },
-    { provider: 'openai', label: 'OpenAI', configured: false, masked: '', status: 'not_configured', category: 'AI & Search' },
+    // Keep this response shape aligned with the backend `/api/settings` endpoint
+    // so onboarding/settings pages continue to work when the dashboard falls back to mock data.
+    { name: 'meta', label: 'Meta (Facebook)', configured: true, maskedKey: '●●●●a4f2', status: 'connected', vaultWarning: false },
+    { name: 'instantly', label: 'Instantly', configured: true, maskedKey: '●●●●x9k1', status: 'connected', vaultWarning: false },
+    { name: 'anthropic', label: 'Anthropic (Claude)', configured: true, maskedKey: '●●●●m7p3', status: 'connected', vaultWarning: false },
+    { name: 'neverbounce', label: 'NeverBounce', configured: true, maskedKey: '●●●●b2j8', status: 'connected', vaultWarning: false },
+    { name: 'bounceban', label: 'BounceBan', configured: true, maskedKey: '●●●●c5n4', status: 'connected', vaultWarning: false },
+    { name: 'exa', label: 'Exa Search', configured: true, maskedKey: '●●●●d1r6', status: 'connected', vaultWarning: false },
+    { name: 'apollo', label: 'Apollo.io', configured: false, maskedKey: null, status: 'not_configured', vaultWarning: false },
+    { name: 'snovio', label: 'Snov.io', configured: false, maskedKey: null, status: 'not_configured', vaultWarning: false },
+    { name: 'lusha', label: 'Lusha', configured: false, maskedKey: null, status: 'not_configured', vaultWarning: false },
+    { name: 'getprospect', label: 'GetProspect', configured: false, maskedKey: null, status: 'not_configured', vaultWarning: false },
+    { name: 'hetrixtools', label: 'HetrixTools', configured: false, maskedKey: null, status: 'not_configured', vaultWarning: false },
+    { name: 'openai', label: 'OpenAI', configured: false, maskedKey: null, status: 'not_configured', vaultWarning: false },
   ],
 
   '/api/settings/services': [],
@@ -182,7 +184,7 @@ export const MOCK_RESPONSES: Record<string, unknown> = {
   '/api/settings/onboarding-status': {
     complete: true,
     steps: {
-      apiKeys: { configured: 6, required: 3, requiredProviders: ['meta', 'instantly', 'anthropic'] },
+      apiKeys: { configured: 6, required: 3, requiredProviders: ['apify', 'instantly', 'anthropic'] },
       keywords: { count: 10, minimum: 5 },
       sources: { configured: 2, minimum: 1 },
       schedule: { configured: true },
