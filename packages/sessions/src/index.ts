@@ -4,6 +4,7 @@ export {
   storeCredential,
   getCredential,
   getActiveCredentials,
+  getServiceApiKey,
   rotateEncryptionKey,
   type DecryptedCredential,
 } from './vault';

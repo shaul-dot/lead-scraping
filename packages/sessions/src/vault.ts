@@ -123,6 +123,27 @@ export async function getActiveCredentials(service: string): Promise<DecryptedCr
   return records.map(toDecryptedCredential);
 }
 
+/**
+ * Fetches an API key stored via Settings/onboarding.
+ * Returns null if vault is not configured, key not found, or decryption fails.
+ */
+export async function getServiceApiKey(service: string): Promise<string | null> {
+  if (!process.env.SESSION_ENCRYPTION_KEY) return null;
+
+  const record = await prisma.sessionCredential.findFirst({
+    where: { service, account: 'api_key' },
+    select: { encryptedPassword: true },
+  });
+
+  if (!record?.encryptedPassword) return null;
+
+  try {
+    return decrypt(Buffer.from(record.encryptedPassword));
+  } catch {
+    return null;
+  }
+}
+
 export async function rotateEncryptionKey(oldKey: string, newKey: string): Promise<number> {
   const oldKeyBuf = Buffer.from(oldKey, 'hex');
   const newKeyBuf = Buffer.from(newKey, 'hex');

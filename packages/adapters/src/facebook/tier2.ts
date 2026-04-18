@@ -1,6 +1,7 @@
 import { ApifyClient } from 'apify-client';
 import { BaseAdapter, type AdapterResult, type LeadInput } from '../base';
 import { qualifyAd, type RawFacebookAd } from './qualify';
+import { getServiceApiKey } from '@hyperscale/sessions';
 
 const ACTOR_ID = 'curious_coder~facebook-ads-library-scraper';
 
@@ -24,11 +25,28 @@ interface ApifyAdResult {
 }
 
 export class FacebookTier2Adapter extends BaseAdapter {
-  private client: ApifyClient;
+  private client: ApifyClient | null = null;
+  private token: string | null = null;
 
   constructor() {
     super('facebook_ads');
-    this.client = new ApifyClient({ token: process.env.APIFY_TOKEN ?? '' });
+  }
+
+  private async getClient(): Promise<ApifyClient> {
+    if (this.client) return this.client;
+
+    const fromVault = await getServiceApiKey('apify');
+    const token = fromVault ?? process.env.APIFY_TOKEN ?? '';
+
+    if (!token) {
+      throw new Error(
+        'No Apify token configured — add one via onboarding or set APIFY_TOKEN in .env',
+      );
+    }
+
+    this.token = token; // cached, but never logged
+    this.client = new ApifyClient({ token });
+    return this.client;
   }
 
   async scrape(
@@ -44,7 +62,8 @@ export class FacebookTier2Adapter extends BaseAdapter {
     try {
       this.logger.info({ keyword, country, maxResults }, 'Starting Facebook Tier 2 (Apify) scrape');
 
-      const run = await this.client.actor(ACTOR_ID).call({
+      const client = await this.getClient();
+      const run = await client.actor(ACTOR_ID).call({
         searchTerms: [keyword],
         countryCode: country,
         adType: 'all',
@@ -54,7 +73,7 @@ export class FacebookTier2Adapter extends BaseAdapter {
 
       this.logger.info({ runId: run.id }, 'Apify run started, waiting for completion');
 
-      const { items } = await this.client
+      const { items } = await client
         .dataset(run.defaultDatasetId)
         .listItems();
 
@@ -101,12 +120,9 @@ export class FacebookTier2Adapter extends BaseAdapter {
   }
 
   async healthCheck(): Promise<{ healthy: boolean; message?: string }> {
-    if (!process.env.APIFY_TOKEN) {
-      return { healthy: false, message: 'APIFY_TOKEN not configured' };
-    }
-
     try {
-      const actor = await this.client.actor(ACTOR_ID).get();
+      const client = await this.getClient();
+      const actor = await client.actor(ACTOR_ID).get();
       if (!actor) {
         return { healthy: false, message: 'Facebook Ads Library Scraper actor not found' };
       }
