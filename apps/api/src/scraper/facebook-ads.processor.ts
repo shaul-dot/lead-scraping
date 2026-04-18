@@ -104,7 +104,14 @@ export class FacebookAdsProcessor extends WorkerHost {
     }
 
     logger.info(
-      { jobId: job.id, created, skipped, keyword },
+      {
+        jobId: job.id,
+        created,
+        skipped,
+        keyword,
+        rejectedByReason: result.metadata.rejectedByReason,
+        otherRejected: result.metadata.otherRejected,
+      },
       'Facebook Ads scrape job completed',
     );
 
