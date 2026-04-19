@@ -47,6 +47,8 @@ export class FacebookAdsProcessor extends WorkerHost {
 
     let created = 0;
     let skipped = 0;
+    let advertisersCreated = 0;
+    let advertisersExisting = 0;
 
     for (const lead of result.leads) {
       try {
@@ -71,24 +73,73 @@ export class FacebookAdsProcessor extends WorkerHost {
           continue;
         }
 
-        const companyNameNormalized = normalizeForDedup(
-          lead.companyName,
-        );
+        const companyNameNormalized = normalizeForDedup(lead.companyName);
 
-        const newLead = await prisma.lead.create({
-          data: {
-            source: 'FACEBOOK_ADS',
-            status: 'RAW',
-            companyName: lead.companyName,
-            companyNameNormalized,
-            sourceUrl: lead.sourceUrl,
-            sourceHandle: lead.sourceHandle,
-            adCreativeId: lead.adCreativeId,
-            landingPageUrl: lead.landingPageUrl,
-            facebookUrl: lead.facebookUrl,
-            country: lead.country,
-          },
-        });
+        let newLead: { id: string };
+        let advertiserIdForQualify: string | null = null;
+        let advertiserWasNew = false;
+
+        if (pageId) {
+          const outcome = await prisma.$transaction(async (tx) => {
+            const prior = await tx.advertiser.findUnique({
+              where: { pageId },
+              select: { id: true, pageName: true },
+            });
+            const advertiser = await tx.advertiser.upsert({
+              where: { pageId },
+              create: {
+                pageId,
+                pageName: lead.companyName ?? '(unknown)',
+                status: 'UNQUALIFIED',
+              },
+              update: {
+                pageName: lead.companyName ?? prior?.pageName ?? '(unknown)',
+              },
+            });
+            const leadRow = await tx.lead.create({
+              data: {
+                source: 'FACEBOOK_ADS',
+                status: 'RAW',
+                companyName: lead.companyName,
+                companyNameNormalized,
+                sourceUrl: lead.sourceUrl,
+                sourceHandle: lead.sourceHandle,
+                adCreativeId: lead.adCreativeId,
+                landingPageUrl: lead.landingPageUrl,
+                facebookUrl: lead.facebookUrl,
+                country: lead.country,
+                advertiserId: advertiser.id,
+              },
+            });
+            return {
+              lead: leadRow,
+              advertiserId: advertiser.id,
+              wasNew: prior === null,
+            };
+          });
+
+          newLead = outcome.lead;
+          advertiserIdForQualify = outcome.advertiserId;
+          advertiserWasNew = outcome.wasNew;
+
+          if (advertiserWasNew) advertisersCreated++;
+          else advertisersExisting++;
+        } else {
+          newLead = await prisma.lead.create({
+            data: {
+              source: 'FACEBOOK_ADS',
+              status: 'RAW',
+              companyName: lead.companyName,
+              companyNameNormalized,
+              sourceUrl: lead.sourceUrl,
+              sourceHandle: lead.sourceHandle,
+              adCreativeId: lead.adCreativeId,
+              landingPageUrl: lead.landingPageUrl,
+              facebookUrl: lead.facebookUrl,
+              country: lead.country,
+            },
+          });
+        }
 
         if (SCRAPE_ONLY) {
           logger.info(
@@ -98,6 +149,19 @@ export class FacebookAdsProcessor extends WorkerHost {
         } else {
           await this.queueService.addJob('dedup', { leadId: newLead.id });
         }
+
+        // TODO(chunk-4): enqueue qualify job for newly-created advertiser
+        if (advertiserWasNew && advertiserIdForQualify) {
+          // await this.queueService.addJob('qualify', { advertiserId: advertiserIdForQualify });
+          //
+          // Chunk 4 will:
+          //   1. Register the 'qualify' queue in the BullMQ setup
+          //   2. Create apps/api/src/qualification/qualification.processor.ts
+          //   3. Uncomment the line above
+          //
+          // When SCRAPE_ONLY=true, skip this qualify enqueue (same policy as dedup enqueue above).
+        }
+
         created++;
       } catch (err) {
         logger.error(
@@ -112,6 +176,8 @@ export class FacebookAdsProcessor extends WorkerHost {
         jobId: job.id,
         created,
         skipped,
+        advertisersCreated,
+        advertisersExisting,
         keyword,
         rejectedByReason: result.metadata.rejectedByReason,
         otherRejected: result.metadata.otherRejected,
@@ -125,6 +191,8 @@ export class FacebookAdsProcessor extends WorkerHost {
       qualified: result.leads.length,
       created,
       skipped,
+      advertisersCreated,
+      advertisersExisting,
       durationMs: result.metadata.durationMs,
     };
   }
