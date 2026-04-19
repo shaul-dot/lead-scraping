@@ -26,7 +26,8 @@ export type QueueName =
   | 'paperclip-weekly'
   | 'exa-search'
   | 'keyword-score'
-  | 'stats-rollup';
+  | 'stats-rollup'
+  | 'qualify';
 
 export type QueueJobData =
   | { queue: 'scrape-facebook'; data: ScrapeJobInput }
@@ -51,4 +52,5 @@ export type QueueJobData =
   | { queue: 'paperclip-weekly'; data: Record<string, never> }
   | { queue: 'exa-search'; data: ExaSearchInput }
   | { queue: 'keyword-score'; data: { keyword: string; source: string } }
-  | { queue: 'stats-rollup'; data: { date: string } };
+  | { queue: 'stats-rollup'; data: { date: string } }
+  | { queue: 'qualify'; data: { advertiserId: string } };

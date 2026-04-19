@@ -150,16 +150,25 @@ export class FacebookAdsProcessor extends WorkerHost {
           await this.queueService.addJob('dedup', { leadId: newLead.id });
         }
 
-        // TODO(chunk-4): enqueue qualify job for newly-created advertiser
         if (advertiserWasNew && advertiserIdForQualify) {
-          // await this.queueService.addJob('qualify', { advertiserId: advertiserIdForQualify });
-          //
-          // Chunk 4 will:
-          //   1. Register the 'qualify' queue in the BullMQ setup
-          //   2. Create apps/api/src/qualification/qualification.processor.ts
-          //   3. Uncomment the line above
-          //
-          // When SCRAPE_ONLY=true, skip this qualify enqueue (same policy as dedup enqueue above).
+          if (SCRAPE_ONLY) {
+            logger.info(
+              {
+                advertiserId: advertiserIdForQualify,
+                leadId: newLead.id,
+                sourceHandle: lead.sourceHandle,
+              },
+              'SCRAPE_ONLY=true — skipping enqueue to qualify queue',
+            );
+          } else {
+            await this.queueService.addJob('qualify', {
+              advertiserId: advertiserIdForQualify,
+            });
+            logger.info(
+              { advertiserId: advertiserIdForQualify, leadId: newLead.id },
+              'Queued advertiser for qualification',
+            );
+          }
         }
 
         created++;

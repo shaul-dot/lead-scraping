@@ -27,6 +27,7 @@ import { DeliverabilityModule } from './deliverability/deliverability.module';
 import { SettingsModule } from './settings/settings.module';
 import { ManualReviewModule } from './manual-review/manual-review.module';
 import { QaModule } from './qa/qa.module';
+import { QualificationModule } from './qualification/qualification.module';
 
 @Module({
   imports: [
@@ -64,6 +65,7 @@ import { QaModule } from './qa/qa.module';
     SettingsModule,
     ManualReviewModule,
     QaModule,
+    QualificationModule,
   ],
 })
 export class AppModule {}

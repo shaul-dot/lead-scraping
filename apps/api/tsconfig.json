@@ -9,6 +9,7 @@
     "experimentalDecorators": true,
     "noEmit": false,
     "declaration": false,
+    "declarationMap": false,
     "skipLibCheck": true
   },
   "include": ["src/**/*"]
