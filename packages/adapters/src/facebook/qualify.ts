@@ -70,14 +70,14 @@ const LEAD_MAGNET_KEYWORDS = [
 /**
  * Qualifies a Facebook ad against the SOP criteria.
  * An ad qualifies when ALL of these are true:
- *  1. Page/advertiser is in coaching, consulting, education, or e-learning niche
- *  2. Ad is in English
- *  3. Advertiser has at least 1 active ad (stop_time is null or future)
- *  4. Ad promotes a free training, webinar, masterclass, challenge, or workshop
- *  5. Ad targets approved countries
+ *  1. Country filter — approved countries when `country` is present
+ *  2. Niche match — `pageName` + `adText` against NICHE_KEYWORDS
+ *  3. English heuristic — creative bodies
+ *  4. Lead magnet keywords — bodies + link titles/descriptions
+ *  5. Blocklist — phrases and landing-page domains
  */
 export function qualifyAd(ad: RawFacebookAd): QualificationResult {
-  // Check 5: Country filter
+  // Check 1: Country filter
   if (ad.country && !icpConfig.hardFilters.isApprovedCountry(ad.country)) {
     return {
       qualified: false,
@@ -85,19 +85,11 @@ export function qualifyAd(ad: RawFacebookAd): QualificationResult {
     };
   }
 
-  // Check 3: Active ad (ad_delivery_stop_time is null or in the future)
-  if (ad.adDeliveryStopTime) {
-    const stopDate = new Date(ad.adDeliveryStopTime);
-    if (stopDate.getTime() < Date.now()) {
-      return { qualified: false, reason: 'Ad is no longer active (past stop time)' };
-    }
-  }
-
   const allText = ad.adText.toLowerCase();
   const pageNameLower = ad.pageName.toLowerCase();
   const combinedTextForNiche = `${pageNameLower} ${allText}`;
 
-  // Check 1: Page/advertiser is in coaching, consulting, education, or e-learning
+  // Check 2: Niche match (pageName + adText vs NICHE_KEYWORDS)
   const matchesNiche = NICHE_KEYWORDS.some((kw) =>
     combinedTextForNiche.includes(kw),
   );
@@ -108,12 +100,12 @@ export function qualifyAd(ad: RawFacebookAd): QualificationResult {
     };
   }
 
-  // Check 2: Ad is in English (heuristic: check for common English words in creative bodies)
+  // Check 3: English heuristic (creative bodies)
   if (!isLikelyEnglish(ad.adCreativeBodies)) {
     return { qualified: false, reason: 'Ad does not appear to be in English' };
   }
 
-  // Check 4: Ad promotes a free training/webinar/masterclass/challenge/workshop
+  // Check 4: Lead magnet keywords (bodies + link titles/descriptions)
   const textForLeadMagnet = `${allText} ${(ad.adCreativeLinkTitles ?? []).join(' ')} ${(ad.adCreativeLinkDescriptions ?? []).join(' ')}`.toLowerCase();
   const hasLeadMagnet = LEAD_MAGNET_KEYWORDS.some((kw) =>
     textForLeadMagnet.includes(kw),
@@ -125,7 +117,7 @@ export function qualifyAd(ad: RawFacebookAd): QualificationResult {
     };
   }
 
-  // Blocklist checks
+  // Check 5: Blocklist — phrases
   const isBlocklisted = icpConfig.blocklist.phrases.some((phrase) =>
     allText.includes(phrase),
   );
@@ -133,6 +125,7 @@ export function qualifyAd(ad: RawFacebookAd): QualificationResult {
     return { qualified: false, reason: 'Ad text contains blocklisted phrase' };
   }
 
+  // Check 5: Blocklist — landing domains
   if (ad.landingPageUrl) {
     try {
       const domain = new URL(ad.landingPageUrl).hostname.toLowerCase();
