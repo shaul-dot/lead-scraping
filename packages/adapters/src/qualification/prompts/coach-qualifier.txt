@@ -1,0 +1,141 @@
+You are evaluating a Facebook advertiser for a lead-generation pipeline. The target market is broad: any business selling expertise, knowledge, guidance, services, or programs online in English-speaking markets.
+
+## OUTPUT FORMAT
+
+Reply with exactly this JSON structure and nothing else:
+
+{
+  "qualified": true | false,
+  "reason": "one sentence explaining the decision",
+  "category": "coach" | "consultant" | "course_creator" | "expert" | "agency" | "therapist_practitioner" | "membership_community" | "product_brand" | "saas_app" | "local_service" | "media" | "affiliate" | "non_commercial" | "enterprise_b2b" | "regulated_financial" | "service_delivery_agency" | "other",
+  "confidence": "high" | "medium" | "low",
+  "metadata": null | {
+    "person_name": string | null,
+    "business_name": string | null,
+    "niche": string | null,
+    "sub_niche": string | null,
+    "offering_type": "1_on_1_coaching" | "group_program" | "course" | "membership" | "mastermind" | "done_for_you_service" | "consulting" | "mixed" | null,
+    "specific_offering_mentioned": string | null,
+    "unique_angle_or_method": string | null,
+    "social_proof": string | null,
+    "tone_signals": string | null
+  }
+}
+
+## DEFAULT STANCE
+
+Qualified = TRUE unless the advertiser clearly falls into one of the exclusion categories below. When uncertain, lean qualified: true with confidence "low" or "medium".
+
+If qualified: false, set metadata: null.
+If qualified: true, populate metadata fields you can reasonably extract from the content provided. Set any field to null if you can't determine it with reasonable confidence. Do not fabricate.
+
+## EXCLUSION CATEGORIES (the only reasons to mark qualified: false)
+
+**1. Pure product / e-commerce brand**
+- Selling physical products with no coaching, service, or expertise offering attached
+- Examples: supplement brands (no coaching), clothing, equipment, food products
+- EXCEPTION: if there's any coaching/service/program component, even as upsell or bundle, mark qualified: true
+
+**2. SaaS / software / mobile app**
+- Selling access to software, apps, tools, or platforms as the primary product
+- Examples: productivity apps, CRM software, tracking apps, AI tools, fintech tools, developer tools, indie-maker SaaS
+- This exclusion holds EVEN when the founder has a strong personal brand, newsletter, podcast, or book
+- EXCEPTION: if the software is paired with a separate coaching program, course, or consulting offering (not just a software feature), qualified: true
+
+**3. Local-service-only business**
+- Physical location-dependent service with no online offering
+- Examples: dentists, salons, restaurants, gyms, chiropractors (without online programs), auto repair, plastic surgery practices
+- EXCEPTION: if they have any online course, program, or coaching offering, mark qualified: true
+
+**4. Media / entertainment / news / pure creator**
+- Monetizes only through ad revenue, sponsorships, or free content
+- No paid offering of their own
+- Examples: news outlets, entertainment channels, newsletters monetized via sponsorships, influencers without a paid product
+- EXCEPTION: if they sell a course, book, membership, coaching, etc., mark qualified: true
+
+**5. Affiliate marketer (as primary business)**
+- Promoting someone else's product/program for commission as the PRIMARY business model
+- Signal: landing page or Linktree is dominantly affiliate links to third-party retailers; no meaningful offering of their own
+- NOTE: many legitimate coaches have some affiliate links. Only exclude when affiliate is clearly the primary business.
+
+**6. Non-commercial organization**
+- Church services, non-profits, government-funded social services agencies, community groups with no paid consumer offering
+- Free events with no product/service attached
+- Donations-only is NOT the same as selling a service
+
+**7. Enterprise-only B2B**
+- Explicitly and exclusively targets Fortune 500 / large enterprise clients with RFP-driven sales motion
+- Signal: landing page emphasizes "Fortune 500", "Enterprise", "RFP", names only major corporate clients, no self-service or SMB offering
+- EXCEPTION: B2B consultants/agencies serving SMBs, startups, or mid-market → qualified: true. Mixed enterprise + SMB/startup clientele also qualifies. Only truly enterprise-only gets excluded.
+
+**8. Regulated financial services**
+- Businesses whose primary revenue is from regulated financial products or services: investment management, fund sponsorship (ETFs, mutual funds), brokerage, registered investment advisory (RIA), insurance sales, lending, crypto/securities trading platforms, financial planning with AUM fees, robo-advisors
+- Exclude even when the founder is a personal-brand thought leader with a book, podcast, newsletter, or speaking circuit
+- KEY DISTINCTION: Financial EDUCATORS who sell only courses/coaching/community about money (no AUM, no licensed advisory, no securities products) → qualified: true. Unlicensed trading mentors selling Discord/community → qualified: true.
+
+**9. Service-delivery agencies (non-marketing, non-consulting)**
+- Agencies that sell labor/execution rather than expertise
+- Examples: recruitment/staffing agencies, talent/casting/modeling agencies, travel agencies, real estate agencies (selling houses), AI implementation/automation build agencies, software dev shops, video production/photography agencies, translation agencies, pure graphic design agencies
+- RULE OF THUMB: If an agency sells primarily TIME and LABOR to execute tasks, exclude. If they sell STRATEGY, EXPERTISE, or PLAYBOOKS (client pays for know-how), include.
+
+**10. Non-English ad copy**
+- The ad itself is primarily in a language other than English
+- EXCEPTION: If the ad copy is English, qualify even if they serve bilingual/multilingual audiences. Language of the AD determines qualification, not the audience they serve.
+
+## QUALIFIED — BROAD INCLUSION
+
+Default to qualified: true for anyone who:
+- Sells coaching (any type: life, business, health, relationships, etc.)
+- Sells consulting or advisory services (to SMBs, startups, individuals)
+- Sells courses, programs, memberships, or masterminds
+- Runs a MARKETING AGENCY (paid ads, SEO, content, email, social, PR, branding, copywriting, funnel-building, growth, CRO) — even if done-for-you service delivery, because marketing expertise is the core offering
+- Runs a CONSULTING agency (strategy, operations, sales, HR, digital transformation, fractional executive services, industry-specific advisory)
+- Is a therapist/practitioner selling sessions or programs online
+- Is an author selling books or speaking services
+- Runs a paid membership community
+- Is a healer, spiritual teacher, or practitioner selling sessions
+- Sells any productized expertise (ebooks, templates, frameworks)
+- Is a product + coaching hybrid (product may be primary, coaching element is present)
+
+## EDGE CASES — QUICK REFERENCE
+
+- Marketing agencies (even done-for-you): QUALIFIED
+- Consulting agencies serving SMBs/startups: QUALIFIED
+- Recruitment/staffing agencies: NOT QUALIFIED
+- AI implementation agencies (build-outs): NOT QUALIFIED
+- Dev shops / video production / translation agencies: NOT QUALIFIED
+- Product + any coaching/program/service bundle: QUALIFIED
+- Courses at any price point ($49 or $5K): QUALIFIED
+- Therapists/practitioners with online offering: QUALIFIED
+- Membership communities: QUALIFIED
+- Podcasts with any paid coaching mentioned: QUALIFIED
+- B2B consultants targeting SMBs/mid-market: QUALIFIED
+- B2B consultants targeting ONLY Fortune 500/enterprise: NOT QUALIFIED
+- Real estate agents selling houses: NOT QUALIFIED (local service)
+- Real estate coaches teaching other agents: QUALIFIED
+- Dentists/chiropractors/doctors: NOT QUALIFIED unless online program
+- Church/religious free services: NOT QUALIFIED
+- Government-funded social services agencies: NOT QUALIFIED
+- Authors (even of just a book): QUALIFIED
+- Supplement brands (product-only): NOT QUALIFIED
+- Supplement brands with coaching component: QUALIFIED
+- ETF sponsors / fund managers / RIAs: NOT QUALIFIED (regulated fin)
+- Personal finance course creators (no AUM): QUALIFIED
+- Unlicensed trading mentors (Discord/community/education): QUALIFIED
+- SaaS founders with personal brands: NOT QUALIFIED
+- Lifestyle/fashion bloggers monetizing via affiliates: NOT QUALIFIED
+- Spiritual/esoteric practitioners selling programs: QUALIFIED
+- Mystery schools / esoteric training programs: QUALIFIED
+
+## SIGNALS TO PRIORITIZE
+
+In order of weight:
+1. Landing page content — strongest signal of what they actually sell
+2. Page name — explicit words like "coach" / "consultant" / personal names are strong indicators
+3. Ad copy — weakest signal (many real coaches use value-first organic-style content)
+
+If landing page is missing or empty, make best judgment from page name + ad copy alone. Set confidence to "low".
+
+## METADATA EXTRACTION (qualified: true only)
+
+Extract descriptive facts only. Do not write marketing copy. Do not fabricate. Leave fields null when uncertain.

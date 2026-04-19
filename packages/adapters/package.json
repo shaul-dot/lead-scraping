@@ -5,17 +5,21 @@
   "main": "./src/index.ts",
   "types": "./src/index.ts",
   "scripts": {
-    "test": "vitest run"
+    "test": "vitest run",
+    "typecheck:qualification": "tsc --noEmit -p tsconfig.qualification.json"
   },
   "dependencies": {
-    "@hyperscale/database": "workspace:*",
-    "@hyperscale/types": "workspace:*",
+    "@anthropic-ai/sdk": "^0.39.0",
     "@hyperscale/config": "workspace:*",
+    "@hyperscale/database": "workspace:*",
     "@hyperscale/sessions": "workspace:*",
+    "@hyperscale/types": "workspace:*",
     "apify-client": "^2.11.0",
+    "exa-js": "^1.4.0",
     "pino": "^9.6.0"
   },
   "devDependencies": {
+    "@types/node": "^22.19.17",
     "vitest": "^4.1.4"
   }
 }

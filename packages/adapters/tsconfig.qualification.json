@@ -1,0 +1,12 @@
+{
+  "extends": "../../tsconfig.json",
+  "compilerOptions": {
+    "noEmit": true,
+    "rootDir": "./src/qualification",
+    "outDir": "./dist-qualification",
+    "ignoreDeprecations": "6.0",
+    "types": ["node"]
+  },
+  "include": ["src/qualification/**/*.ts"],
+  "exclude": ["src/qualification/**/*.test.ts"]
+}
