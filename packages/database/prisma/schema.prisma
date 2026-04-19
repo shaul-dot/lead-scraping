@@ -75,6 +75,14 @@ enum RemediationStatus {
   ESCALATED
 }
 
+enum AdvertiserQualStatus {
+  UNQUALIFIED
+  QUALIFYING
+  QUALIFIED
+  REJECTED_QUALIFICATION
+  QUALIFICATION_FAILED
+}
+
 model Lead {
   id                    String   @id @default(cuid())
   source                Source
@@ -144,6 +152,9 @@ model Lead {
   keywordId             String?
   keyword               Keyword? @relation(fields: [keywordId], references: [id])
 
+  advertiserId          String?
+  advertiser            Advertiser? @relation(fields: [advertiserId], references: [id])
+
   createdAt             DateTime @default(now())
   scrapedAt             DateTime @default(now())
   updatedAt             DateTime @updatedAt
@@ -153,6 +164,41 @@ model Lead {
   @@index([companyNameNormalized])
   @@index([emailRoot])
   @@index([icpScore])
+  @@index([advertiserId])
+}
+
+model Advertiser {
+  id                   String                 @id @default(cuid())
+  pageId               String                 @unique
+  pageName             String
+
+  status               AdvertiserQualStatus   @default(UNQUALIFIED)
+  category             String?
+  confidence           String?
+  qualificationReason  String?                @db.Text
+  qualifiedAt          DateTime?
+
+  landingPageUrl       String?
+  landingPageContent   String?                @db.Text
+
+  personName           String?
+  businessName         String?
+  niche                String?
+  subNiche             String?
+  offeringType         String?
+  specificOffering     String?                @db.Text
+  uniqueAngle          String?                @db.Text
+  socialProof          String?                @db.Text
+  toneSignals          String?                @db.Text
+
+  createdAt            DateTime               @default(now())
+  updatedAt            DateTime               @updatedAt
+
+  leads                Lead[]
+
+  @@index([status])
+  @@index([category])
+  @@index([niche])
 }
 
 model Remediation {
