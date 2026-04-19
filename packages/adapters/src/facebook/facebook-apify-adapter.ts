@@ -9,10 +9,16 @@ export interface ApifyAdResult {
   pageId?: string;
   pageName?: string;
   adText?: string;
+  /** Facebook Ad Library URL for this ad (not the landing page). */
+  adLibraryUrl?: string;
   linkUrl?: string;
   linkCaption?: string;
   linkTitle?: string;
   linkDescription?: string;
+  /** Snapshot CTA label (e.g. Learn more). */
+  ctaText?: string;
+  /** Snapshot CTA type (e.g. LEARN_MORE). */
+  ctaType?: string;
   country?: string;
   startDate?: string;
   endDate?: string;
@@ -156,7 +162,7 @@ export abstract class FacebookApifyAdapter extends BaseAdapter {
       adCreativeLinkTitles: titles,
       adCreativeLinkDescriptions: descriptions,
       landingPageUrl: item.linkUrl ?? '',
-      adSnapshotUrl: '',
+      adSnapshotUrl: item.adLibraryUrl ?? '',
       adDeliveryStopTime: item.endDate ?? null,
       country: item.country ?? country,
       startDate: item.startDate ?? '',
