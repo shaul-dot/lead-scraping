@@ -175,6 +175,7 @@ export abstract class FacebookApifyAdapter extends BaseAdapter {
       sourceUrl: `https://www.facebook.com/${ad.pageId}`,
       source: this.source,
       facebookUrl: `https://www.facebook.com/${ad.pageId}`,
+      sourceHandle: ad.pageId,
       adCreativeId: ad.adCreativeId,
       landingPageUrl: ad.landingPageUrl,
       country: ad.country,

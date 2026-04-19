@@ -50,13 +50,17 @@ export class FacebookAdsProcessor extends WorkerHost {
 
     for (const lead of result.leads) {
       try {
-        const existing = await prisma.lead.findFirst({
-          where: {
-            source: 'FACEBOOK_ADS',
-            sourceHandle: lead.sourceHandle ?? undefined,
-          },
-          select: { id: true },
-        });
+        const pageId = lead.sourceHandle?.trim();
+        let existing: { id: string } | null = null;
+        if (pageId) {
+          existing = await prisma.lead.findFirst({
+            where: {
+              source: 'FACEBOOK_ADS',
+              sourceHandle: pageId,
+            },
+            select: { id: true },
+          });
+        }
 
         if (existing) {
           logger.debug(
