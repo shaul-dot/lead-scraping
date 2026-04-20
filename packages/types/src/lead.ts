@@ -67,6 +67,7 @@ export interface LeadInput {
   landingPageUrl?: string;
   sourceHandle?: string;
   country?: string;
+  adText?: string;
 }
 
 export interface EnrichedLead extends LeadInput {

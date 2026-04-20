@@ -179,6 +179,7 @@ export abstract class FacebookApifyAdapter extends BaseAdapter {
       adCreativeId: ad.adCreativeId,
       landingPageUrl: ad.landingPageUrl,
       country: ad.country,
+      adText: ad.adText,
     };
   }
 

@@ -108,6 +108,7 @@ export class FacebookAdsProcessor extends WorkerHost {
                 landingPageUrl: lead.landingPageUrl,
                 facebookUrl: lead.facebookUrl,
                 country: lead.country,
+                adText: lead.adText?.trim() || null,
                 advertiserId: advertiser.id,
               },
             });
@@ -137,6 +138,7 @@ export class FacebookAdsProcessor extends WorkerHost {
               landingPageUrl: lead.landingPageUrl,
               facebookUrl: lead.facebookUrl,
               country: lead.country,
+              adText: lead.adText?.trim() || null,
             },
           });
         }

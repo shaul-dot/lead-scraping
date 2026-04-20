@@ -104,6 +104,7 @@ model Lead {
   landingPageUrl        String?
   leadMagnetType        String?
   leadMagnetDescription String?
+  adText                 String? @db.Text
 
   websiteUrl            String?
   linkedinUrl           String?

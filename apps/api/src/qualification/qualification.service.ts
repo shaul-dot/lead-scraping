@@ -13,21 +13,8 @@ type LeadPick = {
   id: string;
   landingPageUrl: string | null;
   createdAt: Date;
-  leadMagnetDescription: string | null;
-  title: string | null;
+  adText: string | null;
 };
-
-/**
- * Facebook leads do not currently persist ad body text on `Lead` (only page name, URLs, etc.).
- * Prefer free-text fields that may hold creative copy when present.
- */
-function pickAdCopy(lead: LeadPick): string {
-  const fromMagnet = lead.leadMagnetDescription?.trim();
-  if (fromMagnet) return fromMagnet;
-  const fromTitle = lead.title?.trim();
-  if (fromTitle) return fromTitle;
-  return '';
-}
 
 function scoreLandingPath(url: string): number {
   try {
@@ -119,8 +106,7 @@ export class QualificationService {
           id: true,
           landingPageUrl: true,
           createdAt: true,
-          leadMagnetDescription: true,
-          title: true,
+          adText: true,
         },
       });
 
@@ -144,7 +130,7 @@ export class QualificationService {
 
       const out = await this.coachQualifier.qualify({
         pageName: advertiser.pageName,
-        adCopy: pickAdCopy(mostRecent),
+        adCopy: mostRecent.adText?.trim() || '',
         landingPageContent,
       });
 

@@ -292,6 +292,7 @@ export class FacebookTier1Adapter extends BaseAdapter {
       adCreativeId: ad.adCreativeId,
       landingPageUrl: ad.landingPageUrl,
       country: ad.country,
+      adText: ad.adText,
     };
   }
 }
