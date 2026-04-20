@@ -3,6 +3,8 @@ import { prisma } from '@hyperscale/database';
 import { CoachQualifier, ExaLandingPageFetcher } from '@hyperscale/adapters/qualification';
 import { getServiceApiKey } from '@hyperscale/sessions';
 import { createLogger } from '../common/logger';
+import { ExaClient } from '@hyperscale/exa';
+import Anthropic from '@anthropic-ai/sdk';
 
 const logger = createLogger('qualification');
 
@@ -12,9 +14,45 @@ const MAX_LANDING_CONTENT_CHARS = 50_000;
 type LeadPick = {
   id: string;
   landingPageUrl: string | null;
+  facebookPageUrl: string | null;
   createdAt: Date;
   adText: string | null;
 };
+
+type CostCounters = {
+  exaFetches: number;
+  exaSearches: number;
+  claudeQualifies: number;
+  claudeDisambiguations: number;
+};
+
+const COST_ESTIMATES = {
+  exaFetch: 0.003,
+  exaSearch: 0.005,
+  claudeQualify: 0.008,
+  claudeDisambiguation: 0.001,
+} as const;
+
+function estimateSpendUsd(c: CostCounters): number {
+  return (
+    c.exaFetches * COST_ESTIMATES.exaFetch +
+    c.exaSearches * COST_ESTIMATES.exaSearch +
+    c.claudeQualifies * COST_ESTIMATES.claudeQualify +
+    c.claudeDisambiguations * COST_ESTIMATES.claudeDisambiguation
+  );
+}
+
+function firstWords(text: string, n: number): string {
+  return text
+    .trim()
+    .split(/\s+/)
+    .slice(0, n)
+    .join(' ');
+}
+
+function isUsableContent(text: string | null): boolean {
+  return Boolean(text && text.trim().length >= 500);
+}
 
 function scoreLandingPath(url: string): number {
   try {
@@ -47,9 +85,11 @@ function pickBestLandingPageUrl(leads: LeadPick[]): string | null {
 export class QualificationService {
   private exaFetcher: ExaLandingPageFetcher | null = null;
   private coachQualifier: CoachQualifier | null = null;
+  private exaClient: ExaClient | null = null;
+  private anthropic: Anthropic | null = null;
 
   private async ensureClients(): Promise<void> {
-    if (this.exaFetcher && this.coachQualifier) return;
+    if (this.exaFetcher && this.coachQualifier && this.exaClient && this.anthropic) return;
 
     const exaKey = (await getServiceApiKey('exa')) ?? process.env.EXA_API_KEY ?? '';
     const anthropicKey =
@@ -68,6 +108,56 @@ export class QualificationService {
 
     this.exaFetcher = new ExaLandingPageFetcher(exaKey);
     this.coachQualifier = new CoachQualifier({ anthropicApiKey: anthropicKey });
+    this.exaClient = new ExaClient(exaKey);
+    this.anthropic = new Anthropic({ apiKey: anthropicKey });
+  }
+
+  private async validateSearchResultMatchesAdvertiser(input: {
+    pageName: string;
+    adTextSnippet: string;
+    url: string;
+    title: string;
+    snippet: string;
+    counters: CostCounters;
+    log: ReturnType<typeof logger.child>;
+  }): Promise<boolean> {
+    input.counters.claudeDisambiguations++;
+    const spend = estimateSpendUsd(input.counters);
+    if (spend > 0.1) {
+      input.log.warn({ spend }, 'Cost cap reached during disambiguation; aborting validation');
+      return false;
+    }
+    if (!this.anthropic) throw new Error('Anthropic client not initialized');
+
+    const prompt = [
+      `Advertiser page name: ${input.pageName}`,
+      `Ad copy snippet: ${input.adTextSnippet}`,
+      '',
+      'Candidate web result:',
+      `Title: ${input.title}`,
+      `Snippet: ${input.snippet}`,
+      `URL: ${input.url}`,
+      '',
+      "Question: Does this web page match the advertiser described by the page name and ad copy? Reply only YES or NO.",
+    ].join('\n');
+
+    const resp = await this.anthropic.messages.create({
+      model: 'claude-haiku-4-5-20251001',
+      max_tokens: 5,
+      temperature: 0,
+      messages: [{ role: 'user', content: prompt }],
+    });
+
+    const text = resp.content
+      .filter((b): b is Anthropic.TextBlock => b.type === 'text')
+      .map((b) => b.text)
+      .join('')
+      .trim()
+      .toUpperCase();
+
+    const ok = text.startsWith('YES');
+    input.log.debug({ url: input.url, answer: text, ok }, 'Search disambiguation validation result');
+    return ok;
   }
 
   async qualifyAdvertiser(advertiserId: string): Promise<void> {
@@ -105,6 +195,7 @@ export class QualificationService {
         select: {
           id: true,
           landingPageUrl: true,
+          facebookPageUrl: true,
           createdAt: true,
           adText: true,
         },
@@ -117,17 +208,76 @@ export class QualificationService {
       const mostRecent = leads[0]!;
       const bestUrl = pickBestLandingPageUrl(leads);
 
+      const counters: CostCounters = {
+        exaFetches: 0,
+        exaSearches: 0,
+        claudeQualifies: 0,
+        claudeDisambiguations: 0,
+      };
+
       let landingPageContent: string | null = null;
-      if (bestUrl) {
-        const fetchResult = await this.exaFetcher.fetch(bestUrl);
-        if (fetchResult.success) {
-          landingPageContent =
-            fetchResult.content.length > MAX_LANDING_CONTENT_CHARS
-              ? fetchResult.content.slice(0, MAX_LANDING_CONTENT_CHARS)
-              : fetchResult.content;
+      let chosenUrl: string | null = bestUrl;
+
+      const tryFetch = async (url: string, source: 'primary' | 'facebook_page' | 'exa_search') => {
+        counters.exaFetches++;
+        const fetchResult = await this.exaFetcher!.fetch(url);
+        log.debug({ url, source, fetchResult }, 'Landing page fetch attempt');
+        if (!fetchResult.success) return null;
+        return fetchResult.content.length > MAX_LANDING_CONTENT_CHARS
+          ? fetchResult.content.slice(0, MAX_LANDING_CONTENT_CHARS)
+          : fetchResult.content;
+      };
+
+      if (chosenUrl) {
+        landingPageContent = await tryFetch(chosenUrl, 'primary');
+      }
+
+      // Fix C: if primary URL missing or fetch failed/empty, try Facebook page URL.
+      if (!isUsableContent(landingPageContent)) {
+        const fbUrl =
+          mostRecent.facebookPageUrl?.trim() ||
+          `https://www.facebook.com/${advertiser.pageId}/`;
+        chosenUrl = fbUrl;
+        landingPageContent = await tryFetch(fbUrl, 'facebook_page');
+      }
+
+      // Fix D: Exa search fallback + Claude disambiguation, if still no usable content.
+      if (!isUsableContent(landingPageContent)) {
+        const adSnippet = firstWords(mostRecent.adText?.trim() || '', 50);
+        const query = `"${advertiser.pageName}" ${adSnippet} coach OR course OR consultant`;
+
+        counters.exaSearches++;
+        const results = await this.exaClient!.search(query, { numResults: 3, type: 'auto' });
+        log.info(
+          { pageId: advertiser.pageId, query, urls: results.map((r) => r.url) },
+          'Exa search fallback invoked',
+        );
+
+        for (const r of results.slice(0, 3)) {
+          const spend = estimateSpendUsd(counters);
+          if (spend > 0.1) {
+            log.warn({ spend, counters }, 'Cost cap reached; aborting search fallback loop');
+            break;
+          }
+
+          const ok = await this.validateSearchResultMatchesAdvertiser({
+            pageName: advertiser.pageName,
+            adTextSnippet: adSnippet,
+            url: r.url,
+            title: r.title ?? '',
+            snippet: (r.text ?? '').slice(0, 400),
+            counters,
+            log,
+          });
+          if (!ok) continue;
+
+          chosenUrl = r.url;
+          landingPageContent = await tryFetch(r.url, 'exa_search');
+          if (isUsableContent(landingPageContent)) break;
         }
       }
 
+      counters.claudeQualifies++;
       const out = await this.coachQualifier.qualify({
         pageName: advertiser.pageName,
         adCopy: mostRecent.adText?.trim() || '',
@@ -142,7 +292,7 @@ export class QualificationService {
           confidence: out.confidence,
           qualificationReason: out.reason,
           qualifiedAt: new Date(),
-          landingPageUrl: bestUrl,
+          landingPageUrl: chosenUrl,
           landingPageContent,
           personName: out.metadata?.personName ?? null,
           businessName: out.metadata?.businessName ?? null,
@@ -157,7 +307,14 @@ export class QualificationService {
       });
 
       log.info(
-        { qualified: out.qualified, category: out.category, confidence: out.confidence },
+        {
+          qualified: out.qualified,
+          category: out.category,
+          confidence: out.confidence,
+          counters,
+          estimatedSpendUsd: estimateSpendUsd(counters),
+          fallbacks: { bestUrl, chosenUrl },
+        },
         'Advertiser qualification complete',
       );
     } catch (err) {
