@@ -1,5 +1,5 @@
 import { BaseAdapter, type AdapterResult, type LeadInput } from '../base';
-import { qualifyAd, type RawFacebookAd } from './qualify';
+import type { RawFacebookAd } from './raw-facebook-ad';
 import { icpConfig } from '@hyperscale/config';
 
 const FB_AD_LIBRARY_BASE = 'https://graph.facebook.com/v18.0/ads_archive';
@@ -97,15 +97,6 @@ export class FacebookTier1Adapter extends BaseAdapter {
         if (seenPageIds.has(ad.page_id)) continue;
 
         const rawAd = this.mapToRawAd(ad);
-        const qualification = qualifyAd(rawAd);
-
-        if (!qualification.qualified) {
-          this.logger.debug(
-            { pageId: rawAd.pageId, reason: qualification.reason },
-            'Ad disqualified',
-          );
-          continue;
-        }
 
         seenPageIds.add(ad.page_id);
         leads.push(this.mapToLead(rawAd, ad));

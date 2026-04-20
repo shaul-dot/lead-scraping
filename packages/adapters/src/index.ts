@@ -5,9 +5,7 @@ export {
   FacebookTier1Adapter,
   FacebookTier2Adapter,
   FacebookTier3Adapter,
-  qualifyAd,
   type RawFacebookAd,
-  type QualificationResult,
 } from './facebook/index';
 
 export {

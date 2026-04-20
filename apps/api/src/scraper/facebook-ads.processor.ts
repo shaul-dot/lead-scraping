@@ -190,8 +190,6 @@ export class FacebookAdsProcessor extends WorkerHost {
         advertisersCreated,
         advertisersExisting,
         keyword,
-        rejectedByReason: result.metadata.rejectedByReason,
-        otherRejected: result.metadata.otherRejected,
       },
       'Facebook Ads scrape job completed',
     );

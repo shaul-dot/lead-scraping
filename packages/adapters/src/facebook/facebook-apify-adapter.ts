@@ -1,6 +1,6 @@
 import { ApifyClient } from 'apify-client';
 import { BaseAdapter, type AdapterResult, type LeadInput } from '../base';
-import { qualifyAd, type RawFacebookAd } from './qualify';
+import type { RawFacebookAd } from './raw-facebook-ad';
 import { getServiceApiKey } from '@hyperscale/sessions';
 
 /** Dataset row shape expected from Apify Facebook Ads Library actors (curious_coder family). */
@@ -89,25 +89,14 @@ export abstract class FacebookApifyAdapter extends BaseAdapter {
       this.logger.info({ totalItems: items.length }, 'Apify run completed');
 
       const leads: LeadInput[] = [];
-      const rejectionCounts = new Map<string, number>();
 
       for (const raw of items) {
         if (leads.length >= maxResults) break;
 
         const item = this.mapDatasetItem(raw);
         const rawAd = this.mapToRawAd(item, country);
-        const qualification = qualifyAd(rawAd);
-
-        if (!qualification.qualified) {
-          const key = qualification.reason ?? 'unknown';
-          rejectionCounts.set(key, (rejectionCounts.get(key) ?? 0) + 1);
-          continue;
-        }
-
         leads.push(this.mapToLead(rawAd));
       }
-
-      const { rejectedByReason, otherRejected } = summarizeRejections(rejectionCounts);
 
       const result: AdapterResult = {
         leads,
@@ -118,8 +107,6 @@ export abstract class FacebookApifyAdapter extends BaseAdapter {
           leadsFound: items.length,
           costEstimate: this.estimateCost(items.length),
           durationMs: Date.now() - startTime,
-          rejectedByReason,
-          otherRejected,
         },
       };
 
@@ -186,28 +173,4 @@ export abstract class FacebookApifyAdapter extends BaseAdapter {
   private estimateCost(itemCount: number): number {
     return itemCount * 0.002;
   }
-}
-
-const REJECTION_SUMMARY_TOP = 8;
-
-/** Top N reasons by count (then key order); remaining rejection counts roll into otherRejected. */
-function summarizeRejections(counts: Map<string, number>): {
-  rejectedByReason: Record<string, number>;
-  otherRejected: number;
-} {
-  if (counts.size === 0) {
-    return { rejectedByReason: {}, otherRejected: 0 };
-  }
-
-  const entries = [...counts.entries()].sort((a, b) => {
-    if (b[1] !== a[1]) return b[1] - a[1];
-    return a[0].localeCompare(b[0]);
-  });
-
-  const top = entries.slice(0, REJECTION_SUMMARY_TOP);
-  const tail = entries.slice(REJECTION_SUMMARY_TOP);
-  const rejectedByReason = Object.fromEntries(top);
-  const otherRejected = tail.reduce((sum, [, c]) => sum + c, 0);
-
-  return { rejectedByReason, otherRejected };
 }

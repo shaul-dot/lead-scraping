@@ -10,7 +10,7 @@ export { FacebookApifyAdapter, type ApifyAdResult } from './facebook-apify-adapt
 export { FacebookApifyCuriousCoderAdapter } from './facebook-apify-curious-coder.adapter';
 export { FacebookTier2Adapter } from './tier2';
 export { FacebookTier3Adapter } from './tier3';
-export { qualifyAd, type RawFacebookAd, type QualificationResult } from './qualify';
+export type { RawFacebookAd } from './raw-facebook-ad';
 
 export async function getActiveFacebookAdapter(): Promise<BaseAdapter> {
   const config = await prisma.sourceConfig.findUnique({

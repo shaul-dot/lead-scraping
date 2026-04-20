@@ -30,10 +30,6 @@ export interface AdapterResult {
     leadsFound: number;
     costEstimate: number;
     durationMs: number;
-    /** Top rejection reasons from qualifyAd (Facebook Tier 2), sorted by count descending. */
-    rejectedByReason?: Record<string, number>;
-    /** Count of rejections not listed in rejectedByReason (beyond top 8 distinct reasons). */
-    otherRejected?: number;
   };
 }
 
