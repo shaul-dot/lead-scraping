@@ -50,8 +50,37 @@ function firstWords(text: string, n: number): string {
     .join(' ');
 }
 
-function isUsableContent(text: string | null): boolean {
-  return Boolean(text && text.trim().length >= 500);
+const BARE_SOCIAL_ROOT_RE = /^https?:\/\/(www\.)?(instagram|facebook|fb)\.(com|me)\/?$/i;
+
+export function isBareSocialRoot(url: string): boolean {
+  return BARE_SOCIAL_ROOT_RE.test(url.trim());
+}
+
+export function isUsableLandingContent(content: string): boolean {
+  const raw = content ?? '';
+  const text = raw.trim();
+  if (!text) return false;
+  if (text.length < 500) return false;
+
+  const lower = text.toLowerCase();
+
+  // Known login walls / thin pages
+  const isInstagramLogin =
+    lower.includes('log into instagram') || lower.includes('log_into_instagram') || /<title>\s*instagram\s*<\/title>/i.test(text);
+  if (isInstagramLogin) return false;
+
+  const isFacebookLogin =
+    lower.includes('log into facebook') || /<title>\s*facebook\s*<\/title>/i.test(text);
+  if (isFacebookLogin) return false;
+
+  const isCloudflare =
+    lower.includes('checking your browser before accessing') || lower.includes('just a moment...');
+  if (isCloudflare) return false;
+
+  // Generic JS redirect stubs
+  if (text.length < 2000 && /window\.location/i.test(text)) return false;
+
+  return true;
 }
 
 function scoreLandingPath(url: string): number {
@@ -228,12 +257,41 @@ export class QualificationService {
           : fetchResult.content;
       };
 
+      // Fix 1: reject bare social root URLs before fetching.
+      if (chosenUrl && isBareSocialRoot(chosenUrl)) {
+        log.info(
+          { advertiserId, rejectedUrl: chosenUrl, reason: 'bare_social_root' },
+          'Landing content rejected, falling back',
+        );
+        chosenUrl = null;
+      }
+
       if (chosenUrl) {
         landingPageContent = await tryFetch(chosenUrl, 'primary');
       }
 
       // Fix C: if primary URL missing or fetch failed/empty, try Facebook page URL.
-      if (!isUsableContent(landingPageContent)) {
+      if (landingPageContent && !isUsableLandingContent(landingPageContent)) {
+        const lower = landingPageContent.toLowerCase();
+        const reason =
+          lower.includes('checking your browser before accessing') || lower.includes('just a moment...')
+            ? 'cloudflare_challenge'
+            : lower.includes('log into instagram') || lower.includes('log_into_instagram')
+              ? 'login_page'
+              : lower.includes('log into facebook')
+                ? 'login_page'
+                : landingPageContent.trim().length < 500
+                  ? 'too_short'
+                  : /window\.location/i.test(landingPageContent) && landingPageContent.length < 2000
+                    ? 'redirect_stub'
+                    : 'login_page';
+        log.info(
+          { advertiserId, rejectedUrl: chosenUrl, reason },
+          'Landing content rejected, falling back',
+        );
+      }
+
+      if (!landingPageContent || !isUsableLandingContent(landingPageContent)) {
         const fbUrl =
           mostRecent.facebookPageUrl?.trim() ||
           `https://www.facebook.com/${advertiser.pageId}/`;
@@ -242,7 +300,14 @@ export class QualificationService {
       }
 
       // Fix D: Exa search fallback + Claude disambiguation, if still no usable content.
-      if (!isUsableContent(landingPageContent)) {
+      if (landingPageContent && !isUsableLandingContent(landingPageContent)) {
+        log.info(
+          { advertiserId, rejectedUrl: chosenUrl, reason: 'unusable_content' },
+          'Landing content rejected, falling back',
+        );
+      }
+
+      if (!landingPageContent || !isUsableLandingContent(landingPageContent)) {
         const adSnippet = firstWords(mostRecent.adText?.trim() || '', 50);
         const query = `"${advertiser.pageName}" ${adSnippet} coach OR course OR consultant`;
 
@@ -273,7 +338,7 @@ export class QualificationService {
 
           chosenUrl = r.url;
           landingPageContent = await tryFetch(r.url, 'exa_search');
-          if (isUsableContent(landingPageContent)) break;
+          if (landingPageContent && isUsableLandingContent(landingPageContent)) break;
         }
       }
 
