@@ -247,7 +247,8 @@ export class FacebookTier1Adapter extends BaseAdapter {
       adCreativeBodies: ad.ad_creative_bodies ?? [],
       adCreativeLinkTitles: ad.ad_creative_link_titles ?? [],
       adCreativeLinkDescriptions: ad.ad_creative_link_descriptions ?? [],
-      landingPageUrl,
+      landingPageUrl: landingPageUrl.trim() ? landingPageUrl.trim() : null,
+      facebookPageUrl: null,
       adSnapshotUrl: ad.ad_snapshot_url ?? '',
       adDeliveryStopTime: ad.ad_delivery_stop_time ?? null,
       country: '', // set per-ad by caller if needed
@@ -279,9 +280,10 @@ export class FacebookTier1Adapter extends BaseAdapter {
       sourceUrl: ad.adSnapshotUrl || `https://www.facebook.com/${ad.pageId}`,
       source: this.source,
       facebookUrl: `https://www.facebook.com/${ad.pageId}`,
+      facebookPageUrl: ad.facebookPageUrl ?? undefined,
       sourceHandle: ad.pageId,
       adCreativeId: ad.adCreativeId,
-      landingPageUrl: ad.landingPageUrl,
+      landingPageUrl: ad.landingPageUrl ?? undefined,
       country: ad.country,
       adText: ad.adText,
     };

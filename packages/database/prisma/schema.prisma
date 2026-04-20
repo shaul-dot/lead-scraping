@@ -110,6 +110,7 @@ model Lead {
   linkedinUrl           String?
   instagramUrl          String?
   facebookUrl           String?
+  facebookPageUrl       String?
   phoneNumber           String?
   country               String?
   employeeCount         Int?

@@ -162,8 +162,8 @@ export function extractBestAdText(snap: Record<string, unknown>): {
       : bodyObj && typeof bodyObj === 'object'
         ? str((bodyObj as Record<string, unknown>).text) ||
           (Array.isArray((bodyObj as Record<string, unknown>).texts)
-            ? (bodyObj as Record<string, unknown>).texts
-                .filter((t): t is string => typeof t === 'string')
+            ? ((bodyObj as Record<string, unknown>).texts as unknown[])
+                .filter((t: unknown): t is string => typeof t === 'string')
                 .join(' ')
             : '')
         : '';

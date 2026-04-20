@@ -62,6 +62,7 @@ export interface LeadInput {
   linkedinUrl?: string;
   instagramUrl?: string;
   facebookUrl?: string;
+  facebookPageUrl?: string;
   phoneNumber?: string;
   adCreativeId?: string;
   landingPageUrl?: string;
