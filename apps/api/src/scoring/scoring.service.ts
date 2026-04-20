@@ -6,6 +6,7 @@ import { searchForIcpVerification } from '@hyperscale/exa';
 import { createLogger } from '../common/logger';
 import { BudgetService } from '../budget/budget.service';
 import { ICP_SCORING_SYSTEM_PROMPT, EXA_VERIFICATION_PROMPT } from './prompts';
+import { getServiceApiKey } from '@hyperscale/sessions';
 
 interface ScoringResult {
   score: number;
@@ -33,10 +34,24 @@ export class ScoringService {
   private anthropic: Anthropic;
 
   constructor(private readonly budgetService: BudgetService) {
+    // Initialized lazily to allow vault lookup (async) and consistent behavior with qualification.
     this.anthropic = new Anthropic();
   }
 
+  private async ensureAnthropic(): Promise<void> {
+    // Anthropic SDK supports per-request auth, but we centralize here to mirror qualification.
+    const anthropicKey =
+      (await getServiceApiKey('anthropic')) ?? process.env.ANTHROPIC_API_KEY ?? '';
+    if (!anthropicKey) {
+      throw new Error(
+        'No Anthropic API key configured — add one via Settings or set ANTHROPIC_API_KEY in .env',
+      );
+    }
+    this.anthropic = new Anthropic({ apiKey: anthropicKey });
+  }
+
   async scoreLead(leadId: string): Promise<ScoringResult> {
+    await this.ensureAnthropic();
     const lead = await prisma.lead.findUniqueOrThrow({ where: { id: leadId } });
 
     await prisma.lead.update({ where: { id: leadId }, data: { status: 'SCORING' } });
