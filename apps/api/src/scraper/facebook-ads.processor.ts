@@ -7,6 +7,7 @@ import { getActiveFacebookAdapter } from '@hyperscale/adapters';
 
 const logger = createLogger('facebook-ads-processor');
 const SCRAPE_ONLY = process.env.SCRAPE_ONLY === 'true';
+const QUALIFY_ONLY = process.env.QUALIFY_ONLY === 'true';
 
 interface FacebookAdsJobData {
   keyword: string;
@@ -145,10 +146,11 @@ export class FacebookAdsProcessor extends WorkerHost {
           });
         }
 
-        if (SCRAPE_ONLY) {
+        if (SCRAPE_ONLY || QUALIFY_ONLY) {
+          const reason = SCRAPE_ONLY ? 'SCRAPE_ONLY=true' : 'QUALIFY_ONLY=true';
           logger.info(
-            { leadId: newLead.id, sourceHandle: lead.sourceHandle },
-            'SCRAPE_ONLY=true — skipping enqueue to dedup queue',
+            { leadId: newLead.id, sourceHandle: lead.sourceHandle, reason },
+            `${reason} — skipping enqueue to dedup queue`,
           );
         } else {
           await this.queueService.addJob('dedup', { leadId: newLead.id });

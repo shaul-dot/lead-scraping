@@ -7,6 +7,7 @@ import { createLogger } from '../common/logger';
 
 const logger = createLogger('instagram-processor');
 const SCRAPE_ONLY = process.env.SCRAPE_ONLY === 'true';
+const QUALIFY_ONLY = process.env.QUALIFY_ONLY === 'true';
 
 interface InstagramJobData {
   keyword: string;
@@ -52,10 +53,11 @@ export class InstagramProcessor extends WorkerHost {
         select: { id: true },
       });
 
-      if (SCRAPE_ONLY) {
+      if (SCRAPE_ONLY || QUALIFY_ONLY) {
+        const reason = SCRAPE_ONLY ? 'SCRAPE_ONLY=true' : 'QUALIFY_ONLY=true';
         logger.info(
-          { jobId: job.id, leads: createdLeads.length },
-          'SCRAPE_ONLY=true — skipping enqueue to dedup queue',
+          { jobId: job.id, leads: createdLeads.length, reason },
+          `${reason} — skipping enqueue to dedup queue`,
         );
       } else {
         for (const lead of createdLeads) {
