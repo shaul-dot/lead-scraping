@@ -111,11 +111,14 @@ export class DedupService {
   ): Promise<Array<{ id: string; similarity: number; companyName: string }>> {
     try {
       const results = await prisma.$queryRaw<
-        Array<{ id: string; company_name_normalized: string; sim: number }>
+        Array<{ id: string; companyNameNormalized: string; sim: number }>
       >`
-        SELECT id, company_name_normalized, similarity(company_name_normalized, ${normalizedName}) as sim
+        SELECT
+          id,
+          "companyNameNormalized",
+          similarity("companyNameNormalized", ${normalizedName}) as sim
         FROM "Lead"
-        WHERE company_name_normalized % ${normalizedName}
+        WHERE "companyNameNormalized" % ${normalizedName}
           AND id != ${excludeId}
           AND status NOT IN ('DEDUPED_DUPLICATE', 'ERROR')
         ORDER BY sim DESC
@@ -125,7 +128,7 @@ export class DedupService {
       return results.map((r) => ({
         id: r.id,
         similarity: r.sim,
-        companyName: r.company_name_normalized,
+        companyName: r.companyNameNormalized,
       }));
     } catch (err) {
       this.logger.error({ err, normalizedName }, 'Fuzzy company match query failed');
