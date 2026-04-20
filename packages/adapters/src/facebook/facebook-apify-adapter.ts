@@ -12,6 +12,8 @@ export interface ApifyAdResult {
   /** Facebook Ad Library URL for this ad (not the landing page). */
   adLibraryUrl?: string;
   linkUrl?: string;
+  /** Facebook page profile URI from snapshot (useful fallback). */
+  facebookPageUrl?: string;
   linkCaption?: string;
   linkTitle?: string;
   linkDescription?: string;
@@ -148,7 +150,8 @@ export abstract class FacebookApifyAdapter extends BaseAdapter {
       adCreativeBodies: bodies,
       adCreativeLinkTitles: titles,
       adCreativeLinkDescriptions: descriptions,
-      landingPageUrl: item.linkUrl ?? '',
+      landingPageUrl: item.linkUrl?.trim() ? item.linkUrl.trim() : null,
+      facebookPageUrl: item.facebookPageUrl?.trim() ? item.facebookPageUrl.trim() : null,
       adSnapshotUrl: item.adLibraryUrl ?? '',
       adDeliveryStopTime: item.endDate ?? null,
       country: item.country ?? country,
@@ -162,9 +165,10 @@ export abstract class FacebookApifyAdapter extends BaseAdapter {
       sourceUrl: `https://www.facebook.com/${ad.pageId}`,
       source: this.source,
       facebookUrl: `https://www.facebook.com/${ad.pageId}`,
+      facebookPageUrl: ad.facebookPageUrl ?? undefined,
       sourceHandle: ad.pageId,
       adCreativeId: ad.adCreativeId,
-      landingPageUrl: ad.landingPageUrl,
+      landingPageUrl: ad.landingPageUrl ?? undefined,
       country: ad.country,
       adText: ad.adText,
     };

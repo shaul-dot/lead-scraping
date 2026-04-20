@@ -7,7 +7,8 @@ export interface RawFacebookAd {
   adCreativeBodies: string[];
   adCreativeLinkTitles: string[];
   adCreativeLinkDescriptions: string[];
-  landingPageUrl: string;
+  landingPageUrl: string | null;
+  facebookPageUrl: string | null;
   adSnapshotUrl: string;
   adDeliveryStopTime: string | null;
   country: string;

@@ -1,12 +1,72 @@
 import { FacebookApifyAdapter, type ApifyAdResult } from './facebook-apify-adapter';
+import pino from 'pino';
 
 const ACTOR_ID = 'curious_coder~facebook-ads-library-scraper';
 
 /** This actor rejects runs when charged-result caps are below 10. */
 const APIFY_MIN_COUNT = 10;
 
+const logger = pino({ name: 'adapter:facebook_apify_curious_coder' });
+
 function str(v: unknown): string {
   return typeof v === 'string' ? v : '';
+}
+
+const TEMPLATE_RE = /\{\{[^}]+\}\}/g;
+const SOCIAL_ROOT_RE = /^https?:\/\/(www\.)?(instagram|facebook|fb)\.(com|me)\/?$/i;
+const HOSTNAME_RE = /^[a-z0-9][a-z0-9-]*(\.[a-z]{2,})+$/i;
+const GENERIC_SOCIAL_HOSTNAMES = new Set(['instagram.com', 'facebook.com', 'fb.me']);
+
+function stripTemplatePlaceholders(text: string): { text: string; hadTemplate: boolean } {
+  const hadTemplate = TEMPLATE_RE.test(text);
+  TEMPLATE_RE.lastIndex = 0;
+  const withoutTemplates = text.replaceAll(TEMPLATE_RE, '');
+  // Preserve intentional newlines (card text often uses line breaks).
+  const normalized = withoutTemplates
+    .split('\n')
+    .map((line) => line.replace(/[ \t]+/g, ' ').trimEnd())
+    .join('\n')
+    .trim();
+  const stripped = normalized.replace(/\n{3,}/g, '\n\n').trim();
+  return { text: stripped, hadTemplate };
+}
+
+function isBareSocialRootUrl(url: string): boolean {
+  return SOCIAL_ROOT_RE.test(url.trim());
+}
+
+function normalizeHostname(hostname: string): string {
+  return hostname.trim().toLowerCase().replace(/^www\./, '');
+}
+
+function looksLikeNonSocialHostname(caption: string): boolean {
+  const h = normalizeHostname(caption);
+  if (!HOSTNAME_RE.test(h)) return false;
+  if (GENERIC_SOCIAL_HOSTNAMES.has(h)) return false;
+  return true;
+}
+
+// Returns best URL available in the ad snapshot, or null
+export function pickBestLandingPageUrl(snap: Record<string, unknown>): string | null {
+  const direct = str(snap.link_url).trim();
+  if (direct && !isBareSocialRootUrl(direct)) return direct;
+
+  const cards = snap.cards;
+  if (Array.isArray(cards)) {
+    for (const c of cards) {
+      if (!c || typeof c !== 'object') continue;
+      const card = c as Record<string, unknown>;
+      const cu = str(card.link_url).trim();
+      if (cu && !isBareSocialRootUrl(cu)) return cu;
+    }
+  }
+
+  const caption = str(snap.caption).trim();
+  if (caption && looksLikeNonSocialHostname(caption)) {
+    return `https://${normalizeHostname(caption)}/`;
+  }
+
+  return null;
 }
 
 function isoFromUnixField(v: unknown): string {
@@ -23,25 +83,21 @@ function isoFromUnixField(v: unknown): string {
   return '';
 }
 
-/** Creative body only: root/card body text and extra_texts (not headlines/captions/CTA). */
-function extractAdTextFromSnapshot(snap: Record<string, unknown>): string {
+function collectBodyLikeText(snap: Record<string, unknown>): string[] {
   const parts: string[] = [];
 
-  const body =
-    snap.body && typeof snap.body === 'object' ? (snap.body as Record<string, unknown>) : null;
-  if (body) {
-    const single = str(body.text).trim();
+  const body = snap.body;
+  if (typeof body === 'string') {
+    const t = body.trim();
+    if (t) parts.push(t);
+  } else if (body && typeof body === 'object') {
+    const bo = body as Record<string, unknown>;
+    const single = str(bo.text).trim();
     if (single) {
       parts.push(single);
-    } else {
-      const texts = body.texts;
-      if (Array.isArray(texts)) {
-        const joined = texts
-          .filter((t): t is string => typeof t === 'string')
-          .join('\n')
-          .trim();
-        if (joined) parts.push(joined);
-      }
+    } else if (Array.isArray(bo.texts)) {
+      const joined = bo.texts.filter((t): t is string => typeof t === 'string').join('\n').trim();
+      if (joined) parts.push(joined);
     }
   }
 
@@ -50,23 +106,21 @@ function extractAdTextFromSnapshot(snap: Record<string, unknown>): string {
     for (const c of cards) {
       if (!c || typeof c !== 'object') continue;
       const card = c as Record<string, unknown>;
-      const cb =
-        card.body && typeof card.body === 'object'
-          ? (card.body as Record<string, unknown>)
-          : null;
-      if (cb) {
-        const ct = str(cb.text).trim();
+      const cb = card.body;
+      if (typeof cb === 'string') {
+        const t = cb.trim();
+        if (t) parts.push(t);
+      } else if (cb && typeof cb === 'object') {
+        const cbo = cb as Record<string, unknown>;
+        const ct = str(cbo.text).trim();
         if (ct) {
           parts.push(ct);
-        } else {
-          const cts = cb.texts;
-          if (Array.isArray(cts)) {
-            const joined = cts
-              .filter((t): t is string => typeof t === 'string')
-              .join('\n')
-              .trim();
-            if (joined) parts.push(joined);
-          }
+        } else if (Array.isArray(cbo.texts)) {
+          const joined = cbo.texts
+            .filter((t): t is string => typeof t === 'string')
+            .join('\n')
+            .trim();
+          if (joined) parts.push(joined);
         }
       }
     }
@@ -81,7 +135,93 @@ function extractAdTextFromSnapshot(snap: Record<string, unknown>): string {
     if (joined) parts.push(joined);
   }
 
-  return parts.join('\n\n').trim();
+  return parts;
+}
+
+export function extractBestAdText(snap: Record<string, unknown>): {
+  text: string;
+  fallbackUsed:
+    | 'body'
+    | 'cards'
+    | 'extra_texts'
+    | 'title'
+    | 'link_description'
+    | 'caption'
+    | 'card_title'
+    | 'card_description'
+    | 'card_caption'
+    | 'none';
+  templateDetected: boolean;
+} {
+  const primaryPieces = collectBodyLikeText(snap);
+
+  const bodyObj = snap.body;
+  const bodyTextCandidate =
+    typeof bodyObj === 'string'
+      ? bodyObj
+      : bodyObj && typeof bodyObj === 'object'
+        ? str((bodyObj as Record<string, unknown>).text) ||
+          (Array.isArray((bodyObj as Record<string, unknown>).texts)
+            ? (bodyObj as Record<string, unknown>).texts
+                .filter((t): t is string => typeof t === 'string')
+                .join(' ')
+            : '')
+        : '';
+  const { hadTemplate: bodyHadTemplate } = stripTemplatePlaceholders(String(bodyTextCandidate ?? ''));
+
+  const strippedPrimary = primaryPieces
+    .map((p) => stripTemplatePlaceholders(p).text)
+    .filter(Boolean)
+    .join('\n\n')
+    .trim();
+
+  if (strippedPrimary.length >= 20) {
+    return { text: strippedPrimary, fallbackUsed: 'body', templateDetected: bodyHadTemplate };
+  }
+
+  const altCandidates: Array<{
+    key:
+      | 'title'
+      | 'link_description'
+      | 'caption'
+      | 'card_title'
+      | 'card_description'
+      | 'card_caption';
+    value: string;
+  }> = [];
+
+  const title = str(snap.title).trim();
+  if (title) altCandidates.push({ key: 'title', value: title });
+  const desc = str(snap.link_description).trim();
+  if (desc) altCandidates.push({ key: 'link_description', value: desc });
+  const caption = str(snap.caption).trim();
+  if (caption) altCandidates.push({ key: 'caption', value: caption });
+
+  const cards = snap.cards;
+  if (Array.isArray(cards)) {
+    const first = cards.find((c) => c && typeof c === 'object') as Record<string, unknown> | undefined;
+    if (first) {
+      const ct = str(first.title).trim();
+      if (ct) altCandidates.push({ key: 'card_title', value: ct });
+      const cd = str(first.link_description).trim();
+      if (cd) altCandidates.push({ key: 'card_description', value: cd });
+      const cc = str(first.caption).trim();
+      if (cc) altCandidates.push({ key: 'card_caption', value: cc });
+    }
+  }
+
+  for (const alt of altCandidates) {
+    const { text } = stripTemplatePlaceholders(alt.value);
+    if (text.length >= 20) {
+      return { text, fallbackUsed: alt.key, templateDetected: bodyHadTemplate };
+    }
+  }
+
+  if (strippedPrimary.length > 0) {
+    return { text: strippedPrimary, fallbackUsed: 'body', templateDetected: bodyHadTemplate };
+  }
+
+  return { text: '', fallbackUsed: 'none', templateDetected: bodyHadTemplate };
 }
 
 /**
@@ -95,9 +235,10 @@ export function mapCuriousCoderDatasetRow(raw: unknown): ApifyAdResult {
       ? (row.snapshot as Record<string, unknown>)
       : {};
 
-  const adTextRaw = extractAdTextFromSnapshot(snap);
   const pageName = str(row.page_name) || str(snap.page_name);
   const pageId = str(row.page_id) || str(snap.page_id);
+  const extracted = extractBestAdText(snap);
+  const adTextRaw = extracted.text;
 
   const adArchive = row.ad_archive_id ?? row.ad_id;
   const adId =
@@ -105,7 +246,7 @@ export function mapCuriousCoderDatasetRow(raw: unknown): ApifyAdResult {
       ? String(adArchive)
       : '';
 
-  const linkUrl = str(snap.link_url);
+  const linkUrl = pickBestLandingPageUrl(snap);
   const startDate = isoFromUnixField(row.start_date) || str(row.start_date_formatted);
   const endDate = isoFromUnixField(row.end_date) || str(row.end_date_formatted);
 
@@ -122,6 +263,19 @@ export function mapCuriousCoderDatasetRow(raw: unknown): ApifyAdResult {
   const linkDescription = str(snap.link_description);
   const ctaText = str(snap.cta_text);
   const ctaType = str(snap.cta_type);
+  const pageProfileUri = str(snap.page_profile_uri).trim();
+
+  if (extracted.templateDetected && extracted.fallbackUsed !== 'body') {
+    logger.debug(
+      { pageId, fallbackUsed: extracted.fallbackUsed },
+      'adText primary had template placeholder, used fallback',
+    );
+  }
+
+  const rawLinkUrl = str(snap.link_url).trim();
+  if (linkUrl && rawLinkUrl && rawLinkUrl !== linkUrl) {
+    logger.debug({ pageId, source: 'fallback' }, 'landingPageUrl used snapshot fallback');
+  }
 
   return {
     adId: adId || undefined,
@@ -135,6 +289,7 @@ export function mapCuriousCoderDatasetRow(raw: unknown): ApifyAdResult {
     linkDescription: linkDescription || undefined,
     ctaText: ctaText || undefined,
     ctaType: ctaType || undefined,
+    facebookPageUrl: pageProfileUri || undefined,
     country: countryFromRow || undefined,
     startDate: startDate || undefined,
     endDate: endDate || undefined,
