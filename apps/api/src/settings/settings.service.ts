@@ -145,7 +145,7 @@ export class SettingsService {
 
       if (cred?.encryptedPassword) {
         try {
-          const raw = decrypt(Buffer.from(cred.encryptedPassword));
+          const raw = decrypt(cred.encryptedPassword);
           maskedKey = maskKey(raw);
         } catch {
           maskedKey = '●●●● (decrypt error)';
@@ -225,7 +225,7 @@ export class SettingsService {
 
     let apiKey: string;
     try {
-      apiKey = decrypt(Buffer.from(cred.encryptedPassword));
+      apiKey = decrypt(cred.encryptedPassword);
     } catch {
       return { success: false, message: 'Failed to decrypt API key' };
     }

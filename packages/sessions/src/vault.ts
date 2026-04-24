@@ -8,6 +8,14 @@ const ALGORITHM = 'aes-256-gcm';
 const IV_LENGTH = 16;
 const AUTH_TAG_LENGTH = 16;
 
+function toBytes(buf: Buffer): Uint8Array<ArrayBuffer> {
+  // Prisma's Bytes type is Uint8Array<ArrayBuffer> (not ArrayBufferLike).
+  // Buffer can be backed by SharedArrayBuffer in some environments; copy to a fresh ArrayBuffer.
+  const ab = new ArrayBuffer(buf.byteLength);
+  new Uint8Array(ab).set(buf);
+  return new Uint8Array(ab);
+}
+
 export interface DecryptedCredential {
   id: string;
   service: string;
@@ -27,7 +35,7 @@ function getEncryptionKey(): Buffer {
   return Buffer.from(key, 'hex');
 }
 
-export function encrypt(plaintext: string): Buffer {
+export function encrypt(plaintext: string): Uint8Array<ArrayBuffer> {
   const key = getEncryptionKey();
   const iv = randomBytes(IV_LENGTH);
   const cipher = createCipheriv(ALGORITHM, key, iv);
@@ -35,15 +43,16 @@ export function encrypt(plaintext: string): Buffer {
   const encrypted = Buffer.concat([cipher.update(plaintext, 'utf8'), cipher.final()]);
   const authTag = cipher.getAuthTag();
 
-  return Buffer.concat([iv, authTag, encrypted]);
+  return toBytes(Buffer.concat([iv, authTag, encrypted]));
 }
 
-export function decrypt(encrypted: Buffer): string {
+export function decrypt(encrypted: Uint8Array): string {
   const key = getEncryptionKey();
+  const buf = Buffer.from(encrypted);
 
-  const iv = encrypted.subarray(0, IV_LENGTH);
-  const authTag = encrypted.subarray(IV_LENGTH, IV_LENGTH + AUTH_TAG_LENGTH);
-  const ciphertext = encrypted.subarray(IV_LENGTH + AUTH_TAG_LENGTH);
+  const iv = buf.subarray(0, IV_LENGTH);
+  const authTag = buf.subarray(IV_LENGTH, IV_LENGTH + AUTH_TAG_LENGTH);
+  const ciphertext = buf.subarray(IV_LENGTH + AUTH_TAG_LENGTH);
 
   const decipher = createDecipheriv(ALGORITHM, key, iv);
   decipher.setAuthTag(authTag);
@@ -79,19 +88,19 @@ export async function storeCredential(
   return record.id;
 }
 
-function decryptField(encrypted: Buffer | null): string | undefined {
+function decryptField(encrypted: Uint8Array | null): string | undefined {
   if (!encrypted) return undefined;
-  return decrypt(Buffer.from(encrypted));
+  return decrypt(encrypted);
 }
 
 function toDecryptedCredential(record: {
   id: string;
   service: string;
   account: string;
-  encryptedUsername: Buffer | null;
-  encryptedPassword: Buffer | null;
-  encryptedCookies: Buffer | null;
-  totpSecret: Buffer | null;
+  encryptedUsername: Uint8Array | null;
+  encryptedPassword: Uint8Array | null;
+  encryptedCookies: Uint8Array | null;
+  totpSecret: Uint8Array | null;
   phoneNumber: string | null;
   status: string;
   failureCount: number;
@@ -138,7 +147,7 @@ export async function getServiceApiKey(service: string): Promise<string | null> 
   if (!record?.encryptedPassword) return null;
 
   try {
-    return decrypt(Buffer.from(record.encryptedPassword));
+    return decrypt(record.encryptedPassword);
   } catch {
     return null;
   }
@@ -152,7 +161,7 @@ export async function rotateEncryptionKey(oldKey: string, newKey: string): Promi
   let count = 0;
 
   for (const record of records) {
-    const updates: Record<string, Buffer | null> = {};
+    const updates: Record<string, Uint8Array | null> = {};
 
     for (const field of ['encryptedUsername', 'encryptedPassword', 'encryptedCookies', 'totpSecret'] as const) {
       const raw = record[field];
@@ -172,7 +181,7 @@ export async function rotateEncryptionKey(oldKey: string, newKey: string): Promi
       const encrypted = Buffer.concat([cipher.update(plaintext, 'utf8'), cipher.final()]);
       const newAuthTag = cipher.getAuthTag();
 
-      updates[field] = Buffer.concat([newIv, newAuthTag, encrypted]);
+      updates[field] = toBytes(Buffer.concat([newIv, newAuthTag, encrypted]));
     }
 
     if (Object.keys(updates).length > 0) {
