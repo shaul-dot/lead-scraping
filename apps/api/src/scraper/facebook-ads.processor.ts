@@ -5,6 +5,7 @@ import { QueueService } from '../queues/queue.service';
 import { createLogger } from '../common/logger';
 import { getActiveFacebookAdapter } from '@hyperscale/adapters';
 import { normalizeDomain } from '../../../../packages/adapters/src/utils/normalize-domain';
+import { isPlatformDomain } from '../../../../packages/adapters/src/utils/platform-domains';
 
 const logger = createLogger('facebook-ads-processor');
 const SCRAPE_ONLY = process.env.SCRAPE_ONLY === 'true';
@@ -186,7 +187,9 @@ export class FacebookAdsProcessor extends WorkerHost {
     // Domain-based master list dedup for newly created advertisers (batch query).
     const uniqueDomains = [
       ...new Set(
-        pendingNewAdvertisers.map((p) => p.domain).filter((d): d is string => !!d),
+        pendingNewAdvertisers
+          .map((p) => p.domain)
+          .filter((d): d is string => !!d && !isPlatformDomain(d)),
       ),
     ];
 
@@ -209,6 +212,16 @@ export class FacebookAdsProcessor extends WorkerHost {
       }
 
       if (p.domain) {
+        if (isPlatformDomain(p.domain)) {
+          logger.debug({ domain: p.domain }, 'Skipping dedup for platform domain');
+          await this.queueService.addJob('qualify', { advertiserId: p.advertiserId });
+          qualifyEnqueued++;
+          logger.info(
+            { advertiserId: p.advertiserId, leadId: p.leadId },
+            'Queued advertiser for qualification',
+          );
+          continue;
+        }
         const knownId = knownByDomain.get(p.domain);
         if (knownId) {
           await prisma.advertiser.update({
