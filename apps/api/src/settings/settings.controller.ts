@@ -35,13 +35,18 @@ export class SettingsController {
 
     const redisStart = Date.now();
     try {
-      const redis = new Redis({
-        host: process.env.REDIS_HOST ?? 'localhost',
-        port: parseInt(process.env.REDIS_PORT ?? '6379', 10),
-        password: process.env.REDIS_PASSWORD ?? undefined,
-        maxRetriesPerRequest: 1,
-        connectTimeout: 3000,
-      });
+      const redis = process.env.REDIS_URL
+        ? new Redis(process.env.REDIS_URL, {
+            maxRetriesPerRequest: 1,
+            connectTimeout: 3000,
+          })
+        : new Redis({
+            host: process.env.REDIS_HOST ?? 'localhost',
+            port: parseInt(process.env.REDIS_PORT ?? '6379', 10),
+            password: process.env.REDIS_PASSWORD ?? undefined,
+            maxRetriesPerRequest: 1,
+            connectTimeout: 3000,
+          });
       await redis.ping();
       await redis.quit();
       checks.push({ name: 'Redis', status: 'connected', latency: `${Date.now() - redisStart}ms` });
