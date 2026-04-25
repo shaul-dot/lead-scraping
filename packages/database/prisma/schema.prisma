@@ -203,6 +203,24 @@ model Advertiser {
   @@index([niche])
 }
 
+model KnownAdvertiser {
+  id                 String   @id @default(cuid())
+  companyName        String?
+  fullName           String?
+  firstName          String?
+  websiteDomain      String
+  websiteUrlOriginal String?
+  email              String?
+  country            String?
+  addedBy            String?
+  addedDate          DateTime?
+  leadSource         String?
+  importedAt         DateTime @default(now())
+
+  @@index([websiteDomain])
+  @@index([fullName])
+}
+
 model Remediation {
   id            String            @id @default(cuid())
   leadId        String?
