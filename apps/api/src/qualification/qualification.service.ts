@@ -5,6 +5,8 @@ import { getServiceApiKey } from '@hyperscale/sessions';
 import { createLogger } from '../common/logger';
 import { ExaClient } from '@hyperscale/exa';
 import Anthropic from '@anthropic-ai/sdk';
+import { normalizeDomain } from '../../../../packages/adapters/src/utils/normalize-domain';
+import { isPlatformDomain } from '../../../../packages/adapters/src/utils/platform-domains';
 
 const logger = createLogger('qualification');
 
@@ -13,8 +15,10 @@ const MAX_LANDING_CONTENT_CHARS = 50_000;
 
 type LeadPick = {
   id: string;
+  source: 'FACEBOOK_ADS' | 'INSTAGRAM' | 'MANUAL_IMPORT';
   landingPageUrl: string | null;
   facebookPageUrl: string | null;
+  country: string | null;
   createdAt: Date;
   adText: string | null;
 };
@@ -108,6 +112,13 @@ function pickBestLandingPageUrl(leads: LeadPick[]): string | null {
     return b.createdAt.getTime() - a.createdAt.getTime();
   });
   return sorted[0]!.landingPageUrl!.trim();
+}
+
+function getLeadSourceFromLead(lead: LeadPick | null): string | null {
+  if (!lead) return null;
+  if (lead.source === 'FACEBOOK_ADS') return 'FB Ads';
+  if (lead.source === 'INSTAGRAM') return 'IG';
+  return null;
 }
 
 @Injectable()
@@ -223,8 +234,10 @@ export class QualificationService {
         take: 5,
         select: {
           id: true,
+          source: true,
           landingPageUrl: true,
           facebookPageUrl: true,
+          country: true,
           createdAt: true,
           adText: true,
         },
@@ -370,6 +383,59 @@ export class QualificationService {
           toneSignals: out.metadata?.toneSignals ?? null,
         },
       });
+
+      if (out.qualified) {
+        const landingUrl = chosenUrl ?? advertiser.landingPageUrl ?? null;
+        const domain = normalizeDomain(landingUrl);
+        if (!domain) {
+          log.info({ advertiserId, reason: 'no domain' }, 'Skipped KnownAdvertiser insert');
+        } else if (isPlatformDomain(domain)) {
+          log.info({ advertiserId, domain, reason: 'platform domain' }, 'Skipped KnownAdvertiser insert');
+        } else {
+          try {
+            const exists = await prisma.knownAdvertiser.findFirst({
+              where: { websiteDomain: domain },
+              select: { id: true },
+            });
+
+            if (exists) {
+              log.info(
+                { advertiserId, domain, knownAdvertiserId: exists.id, reason: 'already exists' },
+                'Skipped KnownAdvertiser insert',
+              );
+            } else {
+              const leadSource = getLeadSourceFromLead(mostRecent);
+              const personName = out.metadata?.personName ?? advertiser.personName ?? null;
+              const businessName = out.metadata?.businessName ?? advertiser.businessName ?? null;
+              const firstName = personName?.trim().split(/\s+/)[0] ?? null;
+
+              const created = await prisma.knownAdvertiser.create({
+                data: {
+                  companyName: businessName,
+                  fullName: personName,
+                  firstName,
+                  websiteDomain: domain,
+                  websiteUrlOriginal: landingUrl,
+                  landingPageUrl: landingUrl,
+                  country: mostRecent.country ?? null,
+                  addedBy: 'AI',
+                  addedDate: new Date(),
+                  leadSource,
+                  enrichmentStatus: 'NEEDS_ENRICHMENT',
+                },
+                select: { id: true },
+              });
+
+              log.info(
+                { advertiserId, knownAdvertiserId: created.id, domain },
+                'AI-qualified lead added to KnownAdvertiser',
+              );
+            }
+          } catch (e) {
+            log.error({ advertiserId, domain, err: e }, 'Failed to insert KnownAdvertiser (non-fatal)');
+          }
+        }
+      }
 
       log.info(
         {
