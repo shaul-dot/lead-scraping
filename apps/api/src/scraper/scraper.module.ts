@@ -3,9 +3,10 @@ import { QueueModule } from '../queues/queue.module';
 import { InstagramScraperService } from './instagram.service';
 import { InstagramProcessor } from './instagram.processor';
 import { FacebookAdsProcessor } from './facebook-ads.processor';
+import { StatsModule } from '../stats/stats.module';
 
 @Module({
-  imports: [QueueModule],
+  imports: [QueueModule, StatsModule],
   providers: [
     InstagramScraperService,
     InstagramProcessor,
