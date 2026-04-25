@@ -7,6 +7,7 @@ import { ExaClient } from '@hyperscale/exa';
 import Anthropic from '@anthropic-ai/sdk';
 import { normalizeDomain } from '../../../../packages/adapters/src/utils/normalize-domain';
 import { isPlatformDomain } from '../../../../packages/adapters/src/utils/platform-domains';
+import { StatsService } from '../stats/stats.service';
 
 const logger = createLogger('qualification');
 
@@ -127,6 +128,8 @@ export class QualificationService {
   private coachQualifier: CoachQualifier | null = null;
   private exaClient: ExaClient | null = null;
   private anthropic: Anthropic | null = null;
+
+  constructor(private readonly statsService: StatsService) {}
 
   private async ensureClients(): Promise<void> {
     if (this.exaFetcher && this.coachQualifier && this.exaClient && this.anthropic) return;
@@ -384,6 +387,28 @@ export class QualificationService {
         },
       });
 
+      // Pipeline stats (non-fatal).
+      try {
+        const now = new Date();
+        if (out.qualified) {
+          await this.statsService.incrementStat(now, 'advertisersQualified', 1);
+          await this.statsService.incrementStat(now, 'leadsPassedIcp', 1);
+        } else {
+          await this.statsService.incrementStat(now, 'advertisersRejected', 1);
+        }
+
+        const estimatedSpendUsd = estimateSpendUsd(counters);
+        if (estimatedSpendUsd > 0) {
+          await this.statsService.incrementStat(now, 'llmCostUsd', estimatedSpendUsd);
+        }
+
+        if (counters.exaFetches > 0) {
+          await this.statsService.incrementStat(now, 'exaCostUsd', counters.exaFetches * 0.003);
+        }
+      } catch (err) {
+        log.warn({ err }, 'Failed to track qualification stats (non-fatal)');
+      }
+
       if (out.qualified) {
         const landingUrl = chosenUrl ?? advertiser.landingPageUrl ?? null;
         const domain = normalizeDomain(landingUrl);
@@ -425,6 +450,12 @@ export class QualificationService {
                 },
                 select: { id: true },
               });
+
+              try {
+                await this.statsService.incrementStat(new Date(), 'aiLeadsAddedToMaster', 1);
+              } catch (err) {
+                log.warn({ err }, 'Failed to track aiLeadsAddedToMaster (non-fatal)');
+              }
 
               log.info(
                 { advertiserId, knownAdvertiserId: created.id, domain },

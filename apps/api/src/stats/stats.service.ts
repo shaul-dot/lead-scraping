@@ -13,6 +13,17 @@ function startOfDay(date: Date): Date {
 
 @Injectable()
 export class StatsService {
+  private isCostField(field: string): boolean {
+    return (
+      field === 'apifyCostUsd' ||
+      field === 'phantombusterCostUsd' ||
+      field === 'enrichmentCostUsd' ||
+      field === 'validationCostUsd' ||
+      field === 'llmCostUsd' ||
+      field === 'exaCostUsd'
+    );
+  }
+
   async getDailyStats(date: Date): Promise<DailyStats | null> {
     return prisma.dailyStats.findUnique({
       where: { date: startOfDay(date) },
@@ -25,10 +36,19 @@ export class StatsService {
     amount = 1,
   ): Promise<void> {
     const day = startOfDay(date);
+    const update: Record<string, any> = { [field]: { increment: amount } };
+    if (this.isCostField(field)) {
+      update.totalCostUsd = { increment: amount };
+    }
+
     await prisma.dailyStats.upsert({
       where: { date: day },
-      create: { date: day, [field]: amount },
-      update: { [field]: { increment: amount } },
+      create: {
+        date: day,
+        [field]: amount,
+        ...(this.isCostField(field) ? { totalCostUsd: amount } : null),
+      },
+      update,
     });
   }
 

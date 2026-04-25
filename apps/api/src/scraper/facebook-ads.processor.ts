@@ -6,6 +6,7 @@ import { createLogger } from '../common/logger';
 import { getActiveFacebookAdapter } from '@hyperscale/adapters';
 import { normalizeDomain } from '../../../../packages/adapters/src/utils/normalize-domain';
 import { isPlatformDomain } from '../../../../packages/adapters/src/utils/platform-domains';
+import { StatsService } from '../stats/stats.service';
 
 const logger = createLogger('facebook-ads-processor');
 const SCRAPE_ONLY = process.env.SCRAPE_ONLY === 'true';
@@ -19,7 +20,10 @@ interface FacebookAdsJobData {
 
 @Processor('scrape-facebook')
 export class FacebookAdsProcessor extends WorkerHost {
-  constructor(private readonly queueService: QueueService) {
+  constructor(
+    private readonly queueService: QueueService,
+    private readonly statsService: StatsService,
+  ) {
     super();
   }
 
@@ -47,6 +51,16 @@ export class FacebookAdsProcessor extends WorkerHost {
       },
       'Scrape complete, persisting leads',
     );
+
+    try {
+      const now = new Date();
+      const totalFetched = result.metadata.leadsFound ?? result.leads.length;
+      await this.statsService.incrementStat(now, 'leadsScraped', totalFetched);
+      const apifyCost = totalFetched * 0.001;
+      await this.statsService.incrementStat(now, 'apifyCostUsd', apifyCost);
+    } catch (err) {
+      logger.warn({ jobId: job.id, err }, 'Failed to track scrape stats (non-fatal)');
+    }
 
     let created = 0;
     let skipped = 0;
@@ -249,6 +263,16 @@ export class FacebookAdsProcessor extends WorkerHost {
       { jobId: job.id, total: result.leads.length, deduplicated, qualifyEnqueued },
       'Scrape complete',
     );
+
+    try {
+      const now = new Date();
+      await this.statsService.incrementStat(now, 'fbLeads', advertisersCreated);
+      if (deduplicated > 0) {
+        await this.statsService.incrementStat(now, 'advertisersDeduped', deduplicated);
+      }
+    } catch (err) {
+      logger.warn({ jobId: job.id, err }, 'Failed to track pipeline stats (non-fatal)');
+    }
 
     logger.info(
       {
