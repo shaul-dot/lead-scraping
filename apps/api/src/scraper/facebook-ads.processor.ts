@@ -73,6 +73,7 @@ export class FacebookAdsProcessor extends WorkerHost {
       advertiserId: string;
       leadId: string;
       domain: string | null;
+      pageId: string | null;
     }> = [];
 
     for (const lead of result.leads) {
@@ -186,6 +187,7 @@ export class FacebookAdsProcessor extends WorkerHost {
             advertiserId: advertiserIdForQualify,
             leadId: newLead.id,
             domain,
+            pageId: pageId ?? null,
           });
         }
 
@@ -216,6 +218,27 @@ export class FacebookAdsProcessor extends WorkerHost {
       for (const k of known) knownByDomain.set(k.websiteDomain, k.id);
     }
 
+    // PageId-based master list dedup for platform-domain advertisers (batch query).
+    const uniquePageIds = [
+      ...new Set(
+        pendingNewAdvertisers
+          .filter((p) => !!p.domain && isPlatformDomain(p.domain))
+          .map((p) => p.pageId)
+          .filter((id): id is string => !!id),
+      ),
+    ];
+
+    const knownPageIdSet = new Set<string>();
+    if (uniquePageIds.length > 0) {
+      const known = await prisma.knownAdvertiser.findMany({
+        where: { facebookPageId: { in: uniquePageIds } },
+        select: { facebookPageId: true },
+      });
+      for (const k of known) {
+        if (k.facebookPageId) knownPageIdSet.add(k.facebookPageId);
+      }
+    }
+
     for (const p of pendingNewAdvertisers) {
       if (SCRAPE_ONLY) {
         logger.info(
@@ -227,14 +250,23 @@ export class FacebookAdsProcessor extends WorkerHost {
 
       if (p.domain) {
         if (isPlatformDomain(p.domain)) {
-          logger.debug({ domain: p.domain }, 'Skipping dedup for platform domain');
-          await this.queueService.addJob('qualify', { advertiserId: p.advertiserId });
-          qualifyEnqueued++;
-          logger.info(
-            { advertiserId: p.advertiserId, leadId: p.leadId },
-            'Queued advertiser for qualification',
+          if (p.pageId && knownPageIdSet.has(p.pageId)) {
+            await prisma.advertiser.update({
+              where: { id: p.advertiserId },
+              data: { status: 'ALREADY_KNOWN' },
+            });
+            deduplicated++;
+            logger.info(
+              { advertiserId: p.advertiserId, pageId: p.pageId },
+              'Advertiser already known via pageId, skipping qualify',
+            );
+            continue;
+          }
+
+          logger.debug(
+            { domain: p.domain, hasPageId: !!p.pageId },
+            'Platform domain advertiser not known by pageId; proceeding to qualify',
           );
-          continue;
         }
         const knownId = knownByDomain.get(p.domain);
         if (knownId) {

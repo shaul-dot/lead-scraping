@@ -218,7 +218,8 @@ model KnownAdvertiser {
   companyName        String?
   fullName           String?
   firstName          String?
-  websiteDomain      String
+  websiteDomain      String?
+  facebookPageId     String?
   websiteUrlOriginal String?
   email              String?
   email2             String?
@@ -236,6 +237,7 @@ model KnownAdvertiser {
   importedAt         DateTime @default(now())
 
   @@index([websiteDomain])
+  @@index([facebookPageId])
   @@index([fullName])
   @@index([enrichmentStatus])
 }

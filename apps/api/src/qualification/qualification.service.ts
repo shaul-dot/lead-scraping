@@ -415,7 +415,84 @@ export class QualificationService {
         if (!domain) {
           log.info({ advertiserId, reason: 'no domain' }, 'Skipped KnownAdvertiser insert');
         } else if (isPlatformDomain(domain)) {
-          log.info({ advertiserId, domain, reason: 'platform domain' }, 'Skipped KnownAdvertiser insert');
+          // Platform domains (facebook.com, instagram.com, etc.) don't represent a real website domain.
+          // In that case, fall back to using the Facebook pageId as our dedup key, so social-only
+          // coaches still land in KnownAdvertiser for VA enrichment.
+          if (!advertiser.pageId) {
+            log.info(
+              { advertiserId, domain, reason: 'platform domain, no pageId' },
+              'Skipped KnownAdvertiser insert',
+            );
+          } else {
+            try {
+              const existsByPageId = await prisma.knownAdvertiser.findFirst({
+                where: { facebookPageId: advertiser.pageId },
+                select: { id: true },
+              });
+
+              if (existsByPageId) {
+                log.info(
+                  {
+                    advertiserId,
+                    domain,
+                    knownAdvertiserId: existsByPageId.id,
+                    reason: 'pageId already exists',
+                  },
+                  'Skipped KnownAdvertiser insert',
+                );
+              } else {
+                try {
+                  const leadSource = getLeadSourceFromLead(mostRecent);
+                  const personName = out.metadata?.personName ?? advertiser.personName ?? null;
+                  const businessName = out.metadata?.businessName ?? advertiser.businessName ?? null;
+                  const firstName = personName?.trim().split(/\s+/)[0] ?? null;
+
+                  const created = await prisma.knownAdvertiser.create({
+                    data: {
+                      companyName: businessName,
+                      fullName: personName,
+                      firstName,
+                      websiteDomain: null,
+                      facebookPageId: advertiser.pageId,
+                      websiteUrlOriginal: landingUrl,
+                      landingPageUrl: landingUrl,
+                      country: mostRecent.country ?? null,
+                      addedBy: 'AI',
+                      addedDate: new Date(),
+                      leadSource,
+                      enrichmentStatus: 'NEEDS_ENRICHMENT',
+                    },
+                    select: { id: true },
+                  });
+
+                  try {
+                    await this.statsService.incrementStat(
+                      new Date(),
+                      'aiLeadsAddedToMaster',
+                      1,
+                    );
+                  } catch (err) {
+                    log.warn({ err }, 'Failed to track aiLeadsAddedToMaster (non-fatal)');
+                  }
+
+                  log.info(
+                    { advertiserId, knownAdvertiserId: created.id, pageId: advertiser.pageId },
+                    'AI-qualified lead added to KnownAdvertiser (via pageId)',
+                  );
+                } catch (e) {
+                  log.error(
+                    { advertiserId, pageId: advertiser.pageId, err: e },
+                    'Failed to insert KnownAdvertiser via pageId (non-fatal)',
+                  );
+                }
+              }
+            } catch (e) {
+              log.error(
+                { advertiserId, pageId: advertiser.pageId, err: e },
+                'Failed to dedup KnownAdvertiser via pageId (non-fatal)',
+              );
+            }
+          }
         } else {
           try {
             const exists = await prisma.knownAdvertiser.findFirst({
