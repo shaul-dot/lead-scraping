@@ -84,6 +84,15 @@ enum AdvertiserQualStatus {
   ALREADY_KNOWN
 }
 
+enum EnrichmentStatus {
+  NEEDS_ENRICHMENT
+  IN_PROGRESS
+  ENRICHED
+  CONTACTED
+  REPLIED
+  DEAD
+}
+
 model Lead {
   id                    String   @id @default(cuid())
   source                Source
@@ -212,14 +221,23 @@ model KnownAdvertiser {
   websiteDomain      String
   websiteUrlOriginal String?
   email              String?
+  email2             String?
+  phone              String?
+  title              String?
+  socialMedia        String?
+  employeeCount      String?
+  landingPageUrl     String?
   country            String?
   addedBy            String?
   addedDate          DateTime?
   leadSource         String?
+  enrichmentStatus   EnrichmentStatus @default(NEEDS_ENRICHMENT)
+  enrichmentNotes    String?
   importedAt         DateTime @default(now())
 
   @@index([websiteDomain])
   @@index([fullName])
+  @@index([enrichmentStatus])
 }
 
 model Remediation {
