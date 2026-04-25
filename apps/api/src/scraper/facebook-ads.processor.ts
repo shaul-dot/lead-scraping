@@ -4,6 +4,7 @@ import { prisma } from '@hyperscale/database';
 import { QueueService } from '../queues/queue.service';
 import { createLogger } from '../common/logger';
 import { getActiveFacebookAdapter } from '@hyperscale/adapters';
+import { normalizeDomain } from '../../../../packages/adapters/src/utils/normalize-domain';
 
 const logger = createLogger('facebook-ads-processor');
 const SCRAPE_ONLY = process.env.SCRAPE_ONLY === 'true';
@@ -50,6 +51,14 @@ export class FacebookAdsProcessor extends WorkerHost {
     let skipped = 0;
     let advertisersCreated = 0;
     let advertisersExisting = 0;
+    let deduplicated = 0;
+    let qualifyEnqueued = 0;
+
+    const pendingNewAdvertisers: Array<{
+      advertiserId: string;
+      leadId: string;
+      domain: string | null;
+    }> = [];
 
     for (const lead of result.leads) {
       try {
@@ -157,24 +166,12 @@ export class FacebookAdsProcessor extends WorkerHost {
         }
 
         if (advertiserWasNew && advertiserIdForQualify) {
-          if (SCRAPE_ONLY) {
-            logger.info(
-              {
-                advertiserId: advertiserIdForQualify,
-                leadId: newLead.id,
-                sourceHandle: lead.sourceHandle,
-              },
-              'SCRAPE_ONLY=true — skipping enqueue to qualify queue',
-            );
-          } else {
-            await this.queueService.addJob('qualify', {
-              advertiserId: advertiserIdForQualify,
-            });
-            logger.info(
-              { advertiserId: advertiserIdForQualify, leadId: newLead.id },
-              'Queued advertiser for qualification',
-            );
-          }
+          const domain = lead.landingPageUrl ? normalizeDomain(lead.landingPageUrl) : null;
+          pendingNewAdvertisers.push({
+            advertiserId: advertiserIdForQualify,
+            leadId: newLead.id,
+            domain,
+          });
         }
 
         created++;
@@ -185,6 +182,60 @@ export class FacebookAdsProcessor extends WorkerHost {
         );
       }
     }
+
+    // Domain-based master list dedup for newly created advertisers (batch query).
+    const uniqueDomains = [
+      ...new Set(
+        pendingNewAdvertisers.map((p) => p.domain).filter((d): d is string => !!d),
+      ),
+    ];
+
+    const knownByDomain = new Map<string, string>();
+    if (uniqueDomains.length > 0) {
+      const known = await prisma.knownAdvertiser.findMany({
+        where: { websiteDomain: { in: uniqueDomains } },
+        select: { id: true, websiteDomain: true },
+      });
+      for (const k of known) knownByDomain.set(k.websiteDomain, k.id);
+    }
+
+    for (const p of pendingNewAdvertisers) {
+      if (SCRAPE_ONLY) {
+        logger.info(
+          { advertiserId: p.advertiserId, leadId: p.leadId },
+          'SCRAPE_ONLY=true — skipping enqueue to qualify queue',
+        );
+        continue;
+      }
+
+      if (p.domain) {
+        const knownId = knownByDomain.get(p.domain);
+        if (knownId) {
+          await prisma.advertiser.update({
+            where: { id: p.advertiserId },
+            data: { status: 'ALREADY_KNOWN' },
+          });
+          deduplicated++;
+          logger.info(
+            { advertiserId: p.advertiserId, domain: p.domain, knownAdvertiserId: knownId },
+            'Advertiser already known, skipping qualify',
+          );
+          continue;
+        }
+      }
+
+      await this.queueService.addJob('qualify', { advertiserId: p.advertiserId });
+      qualifyEnqueued++;
+      logger.info(
+        { advertiserId: p.advertiserId, leadId: p.leadId },
+        'Queued advertiser for qualification',
+      );
+    }
+
+    logger.info(
+      { jobId: job.id, total: result.leads.length, deduplicated, qualifyEnqueued },
+      'Scrape complete',
+    );
 
     logger.info(
       {
