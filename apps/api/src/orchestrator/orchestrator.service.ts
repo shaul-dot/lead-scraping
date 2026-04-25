@@ -22,6 +22,16 @@ import type { ScheduleConfig } from './schedule.controller';
 
 const logger = createLogger('orchestrator');
 
+const SCRAPE_CRON = process.env.SCRAPE_CRON_SCHEDULE ?? '0 */3 * * *';
+const CMO_CRON = process.env.CMO_CRON_SCHEDULE ?? '0 6 * * *';
+
+function parsePositiveIntEnv(name: string, fallback: number): number {
+  const raw = process.env[name];
+  const n = raw ? parseInt(raw, 10) : NaN;
+  if (!Number.isFinite(n) || !Number.isInteger(n) || n <= 0) return fallback;
+  return n;
+}
+
 const SOURCES: Source[] = ['FACEBOOK_ADS', 'INSTAGRAM'];
 const SOURCE_TO_QUEUE: Record<string, string> = {
   FACEBOOK_ADS: 'scrape-facebook',
@@ -52,7 +62,17 @@ export class OrchestratorService {
     private readonly reputationMonitor: ReputationMonitorService,
     private readonly rotation: RotationService,
     private readonly remediation: RemediationService,
-  ) {}
+  ) {
+    logger.info(
+      {
+        scrapeCron: SCRAPE_CRON,
+        cmoCron: CMO_CRON,
+        maxResults: process.env.SCRAPE_MAX_RESULTS ?? '30',
+        keywordsPerRun: process.env.SCRAPE_KEYWORDS_PER_RUN ?? '5',
+      },
+      'OrchestratorService initialized with schedule config',
+    );
+  }
 
   // -------------------------------------------------------------------------
   // Schedule config helpers
@@ -73,7 +93,7 @@ export class OrchestratorService {
   // CMO Decision Cycles (.10.4)
   // -------------------------------------------------------------------------
 
-  @Cron('0 6 * * *')
+  @Cron(CMO_CRON)
   async cmoMorningAssessment() {
     if (!(await this.isScheduleEnabled())) {
       logger.info('Schedule disabled — skipping morning assessment');
@@ -167,7 +187,7 @@ export class OrchestratorService {
       const topKeywords = await this.keyword.getTopKeywords(sourceForApi as Source, adjustedCount);
       const queueName = SOURCE_TO_QUEUE[src];
 
-      const maxResults = 100;
+      const maxResults = parsePositiveIntEnv('SCRAPE_MAX_RESULTS', 30);
       const jobs = topKeywords.map((kw) => ({
         data: { keyword: kw.primary, maxResults },
       }));
@@ -222,7 +242,7 @@ export class OrchestratorService {
     }
   }
 
-  @Cron('15 2 * * *')
+  @Cron(SCRAPE_CRON)
   async queueScrapeJobs() {
     if (!(await this.isScheduleEnabled())) {
       logger.info('Schedule disabled — skipping queued scrape jobs');
@@ -233,11 +253,13 @@ export class OrchestratorService {
 
     for (const src of SOURCES) {
       const sourceForApi = src === 'FACEBOOK_ADS' ? 'facebook_ads' : 'instagram';
-      const topKeywords = await this.keyword.getTopKeywords(sourceForApi as Source, 20);
+      const keywordCount = parsePositiveIntEnv('SCRAPE_KEYWORDS_PER_RUN', 5);
+      const topKeywords = await this.keyword.getTopKeywords(sourceForApi as Source, keywordCount);
       const queueName = SOURCE_TO_QUEUE[src];
 
+      const maxResults = parsePositiveIntEnv('SCRAPE_MAX_RESULTS', 30);
       const jobs = topKeywords.map((kw) => ({
-        data: { keyword: kw.primary, maxResults: 100 },
+        data: { keyword: kw.primary, maxResults },
       }));
 
       if (jobs.length > 0) {
