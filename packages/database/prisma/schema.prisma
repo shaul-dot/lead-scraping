@@ -93,11 +93,28 @@ enum EnrichmentStatus {
   DEAD
 }
 
+enum DiscoveryChannel {
+  APIFY_FB_ADS
+  BRIGHTDATA_GRAPH_TRAVERSAL
+  BRIGHTDATA_GOOGLE_NICHE
+  BRIGHTDATA_GOOGLE_FUNNEL
+  BRIGHTDATA_GOOGLE_AGGREGATOR
+  APIFY_HASHTAG_NICHE
+  APIFY_HASHTAG_BEHAVIOR
+}
+
 enum VaReviewStatus {
   UNREVIEWED
   IS_ICP
   NOT_ICP
   BORDERLINE
+}
+
+enum IgCandidateStatus {
+  PENDING_ENRICHMENT
+  ENRICHED
+  ALREADY_KNOWN
+  ENRICHMENT_FAILED
 }
 
 model Lead {
@@ -202,6 +219,11 @@ model Advertiser {
 
   sourceKeyword        String?
 
+  instagramHandle      String?
+  linkedinHandle       String?
+  skoolHandle          String?
+  discoveryChannel     DiscoveryChannel?
+
   personName           String?
   businessName         String?
   niche                String?
@@ -221,6 +243,9 @@ model Advertiser {
   @@index([category])
   @@index([niche])
   @@index([sourceKeyword])
+  @@index([instagramHandle])
+  @@index([linkedinHandle])
+  @@index([skoolHandle])
 }
 
 model KnownAdvertiser {
@@ -248,12 +273,36 @@ model KnownAdvertiser {
   vaReview           VaReviewStatus @default(UNREVIEWED)
   sourceKeyword      String?
 
+  instagramHandle    String?
+  linkedinHandle     String?
+  skoolHandle        String?
+  discoveryChannel   DiscoveryChannel?
+
   @@index([websiteDomain])
   @@index([facebookPageId])
   @@index([fullName])
   @@index([enrichmentStatus])
   @@index([vaReview])
   @@index([sourceKeyword])
+  @@index([instagramHandle])
+  @@index([linkedinHandle])
+  @@index([skoolHandle])
+  @@index([discoveryChannel])
+}
+
+model IgCandidateProfile {
+  id               String            @id @default(cuid())
+  instagramHandle  String            @unique
+  sourceUrl        String?
+  discoveryChannel DiscoveryChannel
+  sourceMetadata   Json?
+  status           IgCandidateStatus @default(PENDING_ENRICHMENT)
+  createdAt        DateTime          @default(now())
+  enrichedAt       DateTime?
+
+  @@index([status])
+  @@index([discoveryChannel])
+  @@index([createdAt])
 }
 
 model Remediation {

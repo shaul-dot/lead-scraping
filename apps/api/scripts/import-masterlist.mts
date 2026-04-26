@@ -2,6 +2,9 @@ import fs from 'node:fs';
 import { parse } from 'csv-parse/sync';
 import * as dbMod from '@hyperscale/database';
 import * as normalizeDomainMod from '../../../packages/adapters/src/utils/normalize-domain';
+const { detectAndNormalizeSocialMedia } = (await import(
+  '../../../packages/adapters/src/utils/normalize-platform-handles.ts'
+)) as any;
 
 const normalizeDomain: (url: string | null | undefined) => string | null =
   (normalizeDomainMod as any).normalizeDomain ??
@@ -83,7 +86,7 @@ for (const r of rows) {
     email2: str(r['Email #2']) || null,
     phone: str(r['Phone #']) || null,
     title: str(r['Title']) || null,
-    socialMedia: str(r['Socia Media']) || null,
+    socialMedia: str(r['Socia Media']) || str(r['Socials']) || null,
     employeeCount: str(r['Emp. #']) || null,
     landingPageUrl: str(r['Landing Page']) || null,
     country: str(r['Country']) || null,
@@ -91,6 +94,12 @@ for (const r of rows) {
     addedDate: parseDateMaybe(r['Date']),
     leadSource: str(r['Socials']) || str(r['Socia Media']) || null,
   };
+
+  const socialMediaValue = (data as any).socialMedia;
+  const detected = detectAndNormalizeSocialMedia(socialMediaValue);
+  (data as any).instagramHandle = detected.platform === 'instagram' ? detected.handle : null;
+  (data as any).linkedinHandle = detected.platform === 'linkedin' ? detected.handle : null;
+  (data as any).skoolHandle = detected.platform === 'skool' ? detected.handle : null;
 
   batch.push(data);
   if (batch.length >= BATCH_SIZE) {
