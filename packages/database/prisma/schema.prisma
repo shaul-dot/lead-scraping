@@ -200,6 +200,8 @@ model Advertiser {
   landingPageUrl       String?
   landingPageContent   String?                @db.Text
 
+  sourceKeyword        String?
+
   personName           String?
   businessName         String?
   niche                String?
@@ -218,6 +220,7 @@ model Advertiser {
   @@index([status])
   @@index([category])
   @@index([niche])
+  @@index([sourceKeyword])
 }
 
 model KnownAdvertiser {
@@ -243,12 +246,14 @@ model KnownAdvertiser {
   enrichmentNotes    String?
   importedAt         DateTime @default(now())
   vaReview           VaReviewStatus @default(UNREVIEWED)
+  sourceKeyword      String?
 
   @@index([websiteDomain])
   @@index([facebookPageId])
   @@index([fullName])
   @@index([enrichmentStatus])
   @@index([vaReview])
+  @@index([sourceKeyword])
 }
 
 model Remediation {

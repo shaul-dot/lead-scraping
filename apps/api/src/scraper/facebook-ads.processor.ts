@@ -117,6 +117,7 @@ export class FacebookAdsProcessor extends WorkerHost {
                 pageId,
                 pageName: lead.companyName ?? '(unknown)',
                 status: 'UNQUALIFIED',
+                sourceKeyword: keyword,
               },
               update: {
                 pageName: lead.companyName ?? prior?.pageName ?? '(unknown)',

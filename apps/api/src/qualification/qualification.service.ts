@@ -461,6 +461,7 @@ export class QualificationService {
                       addedDate: new Date(),
                       leadSource,
                       enrichmentStatus: 'NEEDS_ENRICHMENT',
+                      sourceKeyword: advertiser.sourceKeyword,
                     },
                     select: { id: true },
                   });
@@ -524,6 +525,7 @@ export class QualificationService {
                   addedDate: new Date(),
                   leadSource,
                   enrichmentStatus: 'NEEDS_ENRICHMENT',
+                  sourceKeyword: advertiser.sourceKeyword,
                 },
                 select: { id: true },
               });
