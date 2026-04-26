@@ -52,8 +52,12 @@ function extractProfileHandleFromInstagramUrl(url: string): string | null {
 @Injectable()
 export class IgGoogleNicheService {
   private brightData: BrightDataClient | null = null;
+  private readonly queueService: QueueService;
 
-  constructor(private readonly queueService: QueueService) {}
+  constructor(queueService: QueueService) {
+    // Avoid TS parameter-property edge cases in some runtimes (e.g. tsx execution).
+    this.queueService = queueService;
+  }
 
   private ensureClient(): void {
     if (this.brightData) return;

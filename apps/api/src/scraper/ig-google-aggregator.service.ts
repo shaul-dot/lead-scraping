@@ -12,8 +12,12 @@ const AGGREGATOR_SITES = ['linktr.ee', 'beacons.ai', 'stan.store', 'bento.me'] a
 @Injectable()
 export class IgGoogleAggregatorService {
   private brightData: BrightDataClient | null = null;
+  private readonly queueService: QueueService;
 
-  constructor(private readonly queueService: QueueService) {}
+  constructor(queueService: QueueService) {
+    // Avoid TS parameter-property edge cases in some runtimes (e.g. tsx execution).
+    this.queueService = queueService;
+  }
 
   private ensureClient(): void {
     if (this.brightData) return;
