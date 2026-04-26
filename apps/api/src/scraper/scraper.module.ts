@@ -8,6 +8,7 @@ import { IgEnrichProcessor } from './ig-enrich.processor';
 import { IgGraphTraversalService } from './ig-graph-traversal.service';
 import { IgGoogleNicheService } from './ig-google-niche.service';
 import { IgGoogleFunnelService } from './ig-google-funnel.service';
+import { IgGoogleAggregatorService } from './ig-google-aggregator.service';
 
 @Module({
   imports: [QueueModule, StatsModule],
@@ -19,6 +20,7 @@ import { IgGoogleFunnelService } from './ig-google-funnel.service';
     IgGraphTraversalService,
     IgGoogleNicheService,
     IgGoogleFunnelService,
+    IgGoogleAggregatorService,
   ],
   exports: [InstagramScraperService],
 })

@@ -9,7 +9,8 @@
     "./qualification": "./src/qualification/index.ts",
     "./qualification/qualifier-ig": "./src/qualification/qualifier-ig.ts",
     "./brightdata": "./src/brightdata/index.ts",
-    "./utils/normalize-platform-handles": "./src/utils/normalize-platform-handles.ts"
+    "./utils/normalize-platform-handles": "./src/utils/normalize-platform-handles.ts",
+    "./utils/extract-instagram-handle-from-text": "./src/utils/extract-instagram-handle-from-text.ts"
   },
   "scripts": {
     "test": "vitest run",
