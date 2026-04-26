@@ -163,11 +163,15 @@ export class BrightDataClient {
     return this.waitForInstagramProfileResults(snapshotId);
   }
 
-  async triggerGoogleSearch(queries: string[]): Promise<string> {
+  async triggerGoogleSearch(
+    queries: string[],
+    options?: { country?: string },
+  ): Promise<string> {
     // Bright Data Google dataset expects a URL input (not a "query" field).
     // We encode the query into a standard Google search URL.
+    const gl = options?.country ? options.country.toLowerCase() : null;
     const body = queries.map((query) => ({
-      url: `https://www.google.com/search?q=${encodeURIComponent(query)}`,
+      url: `https://www.google.com/search?q=${encodeURIComponent(query)}${gl ? `&gl=${encodeURIComponent(gl)}` : ''}`,
     }));
     return this.triggerSnapshot(this.googleDatasetId, body);
   }
@@ -181,8 +185,11 @@ export class BrightDataClient {
     return out;
   }
 
-  async googleSearch(queries: string[]): Promise<BrightDataGoogleResult[]> {
-    const snapshotId = await this.triggerGoogleSearch(queries);
+  async googleSearch(
+    queries: string[],
+    options?: { country?: string },
+  ): Promise<BrightDataGoogleResult[]> {
+    const snapshotId = await this.triggerGoogleSearch(queries, options);
     return this.waitForGoogleResults(snapshotId);
   }
 }

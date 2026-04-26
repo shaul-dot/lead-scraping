@@ -93,7 +93,7 @@ describe('IgGoogleFunnelService', () => {
     const queueService = { addJob: vi.fn(async () => 'job') } as any;
     const svc = new IgGoogleFunnelService(queueService);
 
-    const out = await svc.runOneCycle(2);
+    const out = await svc.runOneCycle(2, 'AU');
     expect(out.combinationsUsed).toBe(2);
     expect(out.totalResultsReturned).toBe(3);
     expect(out.candidatesEnqueued).toBe(2);
@@ -104,6 +104,14 @@ describe('IgGoogleFunnelService', () => {
       data: { lastUsedAt: expect.any(Date) },
     });
     expect(queueService.addJob).toHaveBeenCalledTimes(2);
+    expect(googleSearch).toHaveBeenCalledWith(expect.any(Array), { country: 'AU' });
+    expect(prisma.igCandidateProfile.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          sourceMetadata: expect.objectContaining({ rotationCountry: 'AU' }),
+        }),
+      }),
+    );
   });
 
   it('More niches than funnels (or vice versa) -> uses min count, does not crash', async () => {

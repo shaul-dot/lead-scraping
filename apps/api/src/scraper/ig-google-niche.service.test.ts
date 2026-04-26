@@ -38,7 +38,7 @@ describe('IgGoogleNicheService', () => {
     const queueService = { addJob: vi.fn() } as any;
     const svc = new IgGoogleNicheService(queueService);
 
-    const out = await svc.runOneCycle(3);
+    const out = await svc.runOneCycle(3, 'CA');
     expect(out).toEqual({
       keywordsUsed: 0,
       queriesSucceeded: 0,
@@ -75,7 +75,7 @@ describe('IgGoogleNicheService', () => {
     const queueService = { addJob: vi.fn(async () => 'job') } as any;
     const svc = new IgGoogleNicheService(queueService);
 
-    const out = await svc.runOneCycle(2);
+    const out = await svc.runOneCycle(2, 'US');
     expect(out.keywordsUsed).toBe(2);
     expect(out.queriesSucceeded).toBe(2);
     expect(out.totalResultsReturned).toBe(4);
@@ -88,6 +88,17 @@ describe('IgGoogleNicheService', () => {
     });
 
     expect(queueService.addJob).toHaveBeenCalledTimes(2);
+
+    expect(googleSearch).toHaveBeenCalledWith(expect.any(Array), { country: 'US' });
+
+    // Persists rotation country into metadata
+    expect(prisma.igCandidateProfile.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          sourceMetadata: expect.objectContaining({ rotationCountry: 'US' }),
+        }),
+      }),
+    );
   });
 
   it('Bright Data SERP fails -> returns zeros, lastUsedAt still updated', async () => {
@@ -106,7 +117,7 @@ describe('IgGoogleNicheService', () => {
     const queueService = { addJob: vi.fn() } as any;
     const svc = new IgGoogleNicheService(queueService);
 
-    const out = await svc.runOneCycle(1);
+    const out = await svc.runOneCycle(1, 'UK');
     expect(out).toEqual({
       keywordsUsed: 1,
       queriesSucceeded: 0,
@@ -116,6 +127,7 @@ describe('IgGoogleNicheService', () => {
     });
 
     expect(prisma.keyword.updateMany).toHaveBeenCalled();
+    expect(googleSearch).toHaveBeenCalledWith(expect.any(Array), { country: 'UK' });
   });
 
   it('Duplicate candidate (P2002) -> counted as skipped, does not crash', async () => {

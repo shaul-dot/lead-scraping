@@ -79,6 +79,16 @@ export class IgGoogleNicheService {
     totalResultsReturned: number;
     candidatesEnqueued: number;
     candidatesSkippedDuplicates: number;
+  }>;
+  async runOneCycle(
+    keywordBatchSize: number,
+    country?: string,
+  ): Promise<{
+    keywordsUsed: number;
+    queriesSucceeded: number;
+    totalResultsReturned: number;
+    candidatesEnqueued: number;
+    candidatesSkippedDuplicates: number;
   }> {
     // Step A: Pick keywords — only identity-pattern, oldest lastUsedAt first
     const keywords = await prisma.keyword.findMany({
@@ -122,7 +132,10 @@ export class IgGoogleNicheService {
     // Step D: Run Google SERP via Bright Data
     let results: any[] = [];
     try {
-      results = await this.brightData.googleSearch(queries);
+      results = await this.brightData.googleSearch(
+        queries,
+        country ? { country } : undefined,
+      );
     } catch (e) {
       const message = e instanceof Error ? e.message : String(e);
       logger.error({ err: message }, 'Bright Data Google SERP failed');
@@ -159,6 +172,7 @@ export class IgGoogleNicheService {
               title: (r as any).title ?? null,
               description: (r as any).description ?? null,
               rank: (r as any).rank ?? null,
+              rotationCountry: country ?? null,
             },
             status: 'PENDING_ENRICHMENT',
           },

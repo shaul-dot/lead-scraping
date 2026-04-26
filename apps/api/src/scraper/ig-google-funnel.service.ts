@@ -71,7 +71,10 @@ export class IgGoogleFunnelService {
    * - Runs SERP via Bright Data
    * - Inserts candidates from profile URLs, enqueues enrich jobs
    */
-  async runOneCycle(combinationCount: number): Promise<{
+  async runOneCycle(
+    combinationCount: number,
+    country?: string,
+  ): Promise<{
     combinationsUsed: number;
     totalResultsReturned: number;
     candidatesEnqueued: number;
@@ -129,7 +132,10 @@ export class IgGoogleFunnelService {
 
     let results: any[] = [];
     try {
-      results = await this.brightData.googleSearch(queries);
+      results = await this.brightData.googleSearch(
+        queries,
+        country ? { country } : undefined,
+      );
     } catch (e) {
       const message = e instanceof Error ? e.message : String(e);
       logger.error({ err: message }, 'Bright Data Google SERP failed');
@@ -162,6 +168,7 @@ export class IgGoogleFunnelService {
               title: (r as any).title ?? null,
               description: (r as any).description ?? null,
               rank: (r as any).rank ?? null,
+              rotationCountry: country ?? null,
             },
             status: 'PENDING_ENRICHMENT',
           },

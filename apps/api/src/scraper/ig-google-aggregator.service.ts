@@ -31,7 +31,10 @@ export class IgGoogleAggregatorService {
    * For each keyword, generates queries across all aggregator sites.
    * Total queries per cycle = keywordCount × AGGREGATOR_SITES.length
    */
-  async runOneCycle(keywordCount: number): Promise<{
+  async runOneCycle(
+    keywordCount: number,
+    country?: string,
+  ): Promise<{
     keywordsUsed: number;
     totalQueries: number;
     totalResultsReturned: number;
@@ -80,7 +83,10 @@ export class IgGoogleAggregatorService {
 
     let results: any[] = [];
     try {
-      results = await this.brightData.googleSearch(queries);
+      results = await this.brightData.googleSearch(
+        queries,
+        country ? { country } : undefined,
+      );
     } catch (e) {
       const message = e instanceof Error ? e.message : String(e);
       logger.error({ err: message }, 'Bright Data Google SERP failed');
@@ -120,6 +126,7 @@ export class IgGoogleAggregatorService {
               title,
               description,
               aggregatorUrl: url,
+              rotationCountry: country ?? null,
             },
             status: 'PENDING_ENRICHMENT',
           },

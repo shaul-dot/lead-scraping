@@ -1,5 +1,10 @@
 import { describe, expect, it, vi, beforeEach } from 'vitest';
 import { OrchestratorService } from './orchestrator.service';
+import { selectRotationCountry } from './country-rotation';
+
+vi.mock('./country-rotation', () => ({
+  selectRotationCountry: vi.fn(),
+}));
 
 function mkOrchestrator(opts?: {
   c2?: any;
@@ -48,6 +53,8 @@ describe('OrchestratorService.runIgPipelineCycle', () => {
     delete process.env.IG_CHANNEL_2_KEYWORDS_PER_CYCLE;
     delete process.env.IG_CHANNEL_3_COMBINATIONS_PER_CYCLE;
     delete process.env.IG_CHANNEL_4_KEYWORDS_PER_CYCLE;
+
+    (selectRotationCountry as any).mockReturnValue('US');
   });
 
   it('happy path: calls all 3 channels with defaults and returns combined result', async () => {
@@ -66,9 +73,9 @@ describe('OrchestratorService.runIgPipelineCycle', () => {
     const { svc } = mkOrchestrator({ c2, c3, c4 });
 
     const out = await svc.runIgPipelineCycle();
-    expect(c2.runOneCycle).toHaveBeenCalledWith(3);
-    expect(c3.runOneCycle).toHaveBeenCalledWith(3);
-    expect(c4.runOneCycle).toHaveBeenCalledWith(2);
+    expect(c2.runOneCycle).toHaveBeenCalledWith(3, 'US');
+    expect(c3.runOneCycle).toHaveBeenCalledWith(3, 'US');
+    expect(c4.runOneCycle).toHaveBeenCalledWith(2, 'US');
 
     expect(out).toEqual({
       channel2: { keywordsUsed: 3, candidatesEnqueued: 10, candidatesSkippedDuplicates: 2 },
@@ -118,9 +125,9 @@ describe('OrchestratorService.runIgPipelineCycle', () => {
     const { svc } = mkOrchestrator({ c2, c3, c4 });
 
     const out = await svc.runIgPipelineCycle();
-    expect(c2.runOneCycle).toHaveBeenCalledWith(4);
-    expect(c3.runOneCycle).toHaveBeenCalledWith(5);
-    expect(c4.runOneCycle).toHaveBeenCalledWith(6);
+    expect(c2.runOneCycle).toHaveBeenCalledWith(4, 'US');
+    expect(c3.runOneCycle).toHaveBeenCalledWith(5, 'US');
+    expect(c4.runOneCycle).toHaveBeenCalledWith(6, 'US');
 
     expect(out.channel2).toEqual({ keywordsUsed: 0, candidatesEnqueued: 0, candidatesSkippedDuplicates: 0 });
     expect(out.channel3.combinationsUsed).toBe(5);

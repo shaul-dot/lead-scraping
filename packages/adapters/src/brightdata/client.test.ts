@@ -42,6 +42,61 @@ describe('BrightDataClient', () => {
     expect(id).toBe('snap_1');
   });
 
+  it('googleSearch without country -> trigger URL has no gl param', async () => {
+    const fetchMock = mockFetchSequence([
+      { body: { snapshot_id: 'snap_1' } }, // trigger
+      { body: { status: 'ready', records_count: 0 } }, // progress
+      { body: [] }, // download
+    ]);
+    vi.stubGlobal('fetch', fetchMock as any);
+
+    const client = new BrightDataClient({ apiToken: 'token', pollIntervalMs: 1, maxPollAttempts: 2 });
+    const p = client.googleSearch(['x']);
+    await vi.advanceTimersByTimeAsync(10);
+    await p;
+
+    const triggerCall = (fetchMock as any).mock.calls[0];
+    const body = JSON.parse(triggerCall[1].body);
+    expect(body[0].url).toContain('https://www.google.com/search?q=');
+    expect(body[0].url).not.toContain('&gl=');
+  });
+
+  it('googleSearch with country -> trigger URL includes gl param', async () => {
+    const fetchMock = mockFetchSequence([
+      { body: { snapshot_id: 'snap_1' } }, // trigger
+      { body: { status: 'ready', records_count: 0 } }, // progress
+      { body: [] }, // download
+    ]);
+    vi.stubGlobal('fetch', fetchMock as any);
+
+    const client = new BrightDataClient({ apiToken: 'token', pollIntervalMs: 1, maxPollAttempts: 2 });
+    const p = client.googleSearch(['x'], { country: 'US' });
+    await vi.advanceTimersByTimeAsync(10);
+    await p;
+
+    const triggerCall = (fetchMock as any).mock.calls[0];
+    const body = JSON.parse(triggerCall[1].body);
+    expect(body[0].url).toContain('&gl=us');
+  });
+
+  it('googleSearch with UK -> trigger URL includes gl=uk', async () => {
+    const fetchMock = mockFetchSequence([
+      { body: { snapshot_id: 'snap_1' } }, // trigger
+      { body: { status: 'ready', records_count: 0 } }, // progress
+      { body: [] }, // download
+    ]);
+    vi.stubGlobal('fetch', fetchMock as any);
+
+    const client = new BrightDataClient({ apiToken: 'token', pollIntervalMs: 1, maxPollAttempts: 2 });
+    const p = client.googleSearch(['x'], { country: 'UK' });
+    await vi.advanceTimersByTimeAsync(10);
+    await p;
+
+    const triggerCall = (fetchMock as any).mock.calls[0];
+    const body = JSON.parse(triggerCall[1].body);
+    expect(body[0].url).toContain('&gl=uk');
+  });
+
   it('trigger throws BrightDataError on non-200', async () => {
     const fetchMock = mockFetchSequence([{ ok: false, status: 401, body: 'nope' }]);
     vi.stubGlobal('fetch', fetchMock as any);

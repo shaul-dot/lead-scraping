@@ -13,6 +13,7 @@ import { KeywordCombinatorService } from '../scraper/keyword-combinator.service'
 import { IgGoogleNicheService } from '../scraper/ig-google-niche.service';
 import { IgGoogleFunnelService } from '../scraper/ig-google-funnel.service';
 import { IgGoogleAggregatorService } from '../scraper/ig-google-aggregator.service';
+import { selectRotationCountry } from './country-rotation';
 import {
   morningAssessment,
   middayCheck,
@@ -113,16 +114,17 @@ export class OrchestratorService {
       };
     }
 
-    logger.info('Starting IG pipeline cycle');
+    const country = selectRotationCountry();
+    logger.info({ country }, 'Starting IG pipeline cycle');
 
     const c2Count = parsePositiveIntEnv('IG_CHANNEL_2_KEYWORDS_PER_CYCLE', 3);
     const c3Count = parsePositiveIntEnv('IG_CHANNEL_3_COMBINATIONS_PER_CYCLE', 3);
     const c4Count = parsePositiveIntEnv('IG_CHANNEL_4_KEYWORDS_PER_CYCLE', 2);
 
     const [c2Result, c3Result, c4Result] = await Promise.allSettled([
-      this.igGoogleNicheService.runOneCycle(c2Count),
-      this.igGoogleFunnelService.runOneCycle(c3Count),
-      this.igGoogleAggregatorService.runOneCycle(c4Count),
+      this.igGoogleNicheService.runOneCycle(c2Count, country),
+      this.igGoogleFunnelService.runOneCycle(c3Count, country),
+      this.igGoogleAggregatorService.runOneCycle(c4Count, country),
     ]);
 
     if (c2Result.status === 'rejected') {
@@ -158,7 +160,7 @@ export class OrchestratorService {
             handlesExtractedNone: 0,
           };
 
-    logger.info({ channel2: c2, channel3: c3, channel4: c4 }, 'IG pipeline cycle complete');
+    logger.info({ country, channel2: c2, channel3: c3, channel4: c4 }, 'IG pipeline cycle complete');
 
     return {
       channel2: {
@@ -294,6 +296,8 @@ export class OrchestratorService {
   // -------------------------------------------------------------------------
 
   private async runDailyPipeline(volumeAdjustmentPct = 0): Promise<number> {
+    const country = selectRotationCountry();
+    logger.info({ country, volumeAdjustmentPct }, 'Starting daily pipeline run (country rotation)');
     const config = await this.getScheduleConfig();
     let totalJobs = 0;
 
@@ -325,7 +329,13 @@ export class OrchestratorService {
           continue;
         }
         const maxResults = isFirstScrape ? DEEP_SCRAPE_MAX_RESULTS : SHALLOW_SCRAPE_MAX_RESULTS;
-        jobs.push({ data: { keyword: entry.query, maxResults } });
+        jobs.push({
+          data: {
+            keyword: entry.query,
+            maxResults,
+            ...(src === 'FACEBOOK_ADS' ? { country } : {}),
+          },
+        });
       }
 
       if (jobs.length > 0) {
@@ -385,7 +395,8 @@ export class OrchestratorService {
       return;
     }
 
-    logger.info('Queuing scrape jobs for all sources');
+    const country = selectRotationCountry();
+    logger.info({ country }, 'Queuing scrape jobs for all sources');
 
     for (const src of SOURCES) {
       const keywordCount = parsePositiveIntEnv('SCRAPE_KEYWORDS_PER_RUN', 5);
@@ -411,7 +422,13 @@ export class OrchestratorService {
           continue;
         }
         const maxResults = isFirstScrape ? DEEP_SCRAPE_MAX_RESULTS : SHALLOW_SCRAPE_MAX_RESULTS;
-        jobs.push({ data: { keyword: entry.query, maxResults } });
+        jobs.push({
+          data: {
+            keyword: entry.query,
+            maxResults,
+            ...(src === 'FACEBOOK_ADS' ? { country } : {}),
+          },
+        });
       }
 
       if (jobs.length > 0) {

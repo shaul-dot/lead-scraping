@@ -86,7 +86,7 @@ describe('IgGoogleAggregatorService', () => {
     const queueService = { addJob: vi.fn(async () => 'job') } as any;
     const svc = new IgGoogleAggregatorService(queueService);
 
-    const out = await svc.runOneCycle(3);
+    const out = await svc.runOneCycle(3, 'UK');
     expect(out.keywordsUsed).toBe(3);
     expect(out.totalQueries).toBe(12);
     expect(out.totalResultsReturned).toBe(6);
@@ -95,6 +95,14 @@ describe('IgGoogleAggregatorService', () => {
     expect(out.handlesExtractedNone).toBe(3);
 
     expect(queueService.addJob).toHaveBeenCalledTimes(3);
+    expect(googleSearch).toHaveBeenCalledWith(expect.any(Array), { country: 'UK' });
+    expect(prisma.igCandidateProfile.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          sourceMetadata: expect.objectContaining({ rotationCountry: 'UK' }),
+        }),
+      }),
+    );
     expect(prisma.keyword.updateMany).toHaveBeenCalledWith({
       where: { id: { in: ['k1', 'k2', 'k3'] } },
       data: { lastUsedAt: expect.any(Date) },
