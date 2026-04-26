@@ -9,6 +9,7 @@ import { BlacklistMonitorService } from '../deliverability/blacklist-monitor.ser
 import { ReputationMonitorService } from '../deliverability/reputation-monitor.service';
 import { RotationService } from '../deliverability/rotation.service';
 import { RemediationService } from '../remediation/remediation.service';
+import { KeywordCombinatorService } from '../scraper/keyword-combinator.service';
 import {
   morningAssessment,
   middayCheck,
@@ -57,6 +58,7 @@ export class OrchestratorService {
     private readonly budget: BudgetService,
     private readonly source: SourceService,
     private readonly keyword: KeywordService,
+    private readonly combinator: KeywordCombinatorService,
     private readonly dnsMonitor: DnsMonitorService,
     private readonly blacklistMonitor: BlacklistMonitorService,
     private readonly reputationMonitor: ReputationMonitorService,
@@ -183,13 +185,12 @@ export class OrchestratorService {
       const baseCount = Math.ceil((config.dailyTarget * weight) / 100 / 100);
       const adjustedCount = Math.max(1, Math.round(baseCount * (1 + volumeAdjustmentPct / 100)));
 
-      const sourceForApi = src === 'FACEBOOK_ADS' ? 'facebook_ads' : 'instagram';
-      const topKeywords = await this.keyword.getTopKeywords(sourceForApi as Source, adjustedCount);
+      const topKeywords = await this.combinator.pickNextSearchBatch(adjustedCount);
       const queueName = SOURCE_TO_QUEUE[src];
 
       const maxResults = parsePositiveIntEnv('SCRAPE_MAX_RESULTS', 30);
       const jobs = topKeywords.map((kw) => ({
-        data: { keyword: kw.primary, maxResults },
+        data: { keyword: kw.query, maxResults },
       }));
 
       if (jobs.length > 0) {
@@ -252,14 +253,13 @@ export class OrchestratorService {
     logger.info('Queuing scrape jobs for all sources');
 
     for (const src of SOURCES) {
-      const sourceForApi = src === 'FACEBOOK_ADS' ? 'facebook_ads' : 'instagram';
       const keywordCount = parsePositiveIntEnv('SCRAPE_KEYWORDS_PER_RUN', 5);
-      const topKeywords = await this.keyword.getTopKeywords(sourceForApi as Source, keywordCount);
+      const topKeywords = await this.combinator.pickNextSearchBatch(keywordCount);
       const queueName = SOURCE_TO_QUEUE[src];
 
       const maxResults = parsePositiveIntEnv('SCRAPE_MAX_RESULTS', 30);
       const jobs = topKeywords.map((kw) => ({
-        data: { keyword: kw.primary, maxResults },
+        data: { keyword: kw.query, maxResults },
       }));
 
       if (jobs.length > 0) {

@@ -7,7 +7,8 @@
     "dev": "node --env-file=../../.env -r @swc-node/register src/main.ts",
     "start": "node dist/main",
     "start:prod": "node dist/main",
-    "start:railway": "node -r @swc-node/register src/main.ts"
+    "start:railway": "node -r @swc-node/register src/main.ts",
+    "test": "vitest run"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.39.0",
@@ -41,6 +42,8 @@
     "@nestjs/schematics": "^11.0.0",
     "@swc/cli": "^0.8.1",
     "@types/express": "^5.0.0",
-    "ts-node": "^10.9.2"
+    "@types/node": "^22.0.0",
+    "ts-node": "^10.9.2",
+    "vitest": "^4.1.4"
   }
 }
