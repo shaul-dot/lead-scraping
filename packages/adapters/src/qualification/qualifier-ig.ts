@@ -46,6 +46,7 @@ export interface Stage1Result {
   reason: string;
   category: QualifierCategory | null;
   confidence: QualifierConfidence;
+  inferredCountry: string | null;
   metadata: QualifierMetadata | null;
 }
 
@@ -53,6 +54,7 @@ export interface IgQualifierResult extends QualifierOutput {
   stage: 1 | 2;
   urlFetchAttempted: boolean;
   urlFetchSucceeded: boolean | null;
+  inferredCountry: string | null;
 }
 
 // -----------------------
@@ -169,6 +171,7 @@ function parseStage1Response(rawText: string): Stage1Result {
   const reason = asNonEmptyString(obj.reason) ?? 'No reason provided';
   const confidence = parseConfidence(obj.confidence);
   const category = parseCategoryNullable(obj.category);
+  const inferredCountry = asNonEmptyString(obj.inferredCountry);
 
   if (decision !== 'qualified') {
     return {
@@ -176,6 +179,7 @@ function parseStage1Response(rawText: string): Stage1Result {
       reason,
       category,
       confidence,
+      inferredCountry,
       metadata: null,
     };
   }
@@ -185,11 +189,12 @@ function parseStage1Response(rawText: string): Stage1Result {
     reason,
     category,
     confidence,
+    inferredCountry,
     metadata: parseMetadataFromModel(obj.metadata),
   };
 }
 
-function parseStage2Response(rawText: string): QualifierOutput {
+function parseStage2Response(rawText: string): QualifierOutput & { inferredCountry: string | null } {
   let parsed: unknown;
   try {
     parsed = JSON.parse(stripJsonFences(rawText));
@@ -210,9 +215,10 @@ function parseStage2Response(rawText: string): QualifierOutput {
   const reason = asNonEmptyString(obj.reason) ?? 'No reason provided';
   const category = parseCategory(obj.category);
   const confidence = parseConfidence(obj.confidence);
+  const inferredCountry = asNonEmptyString(obj.inferredCountry);
 
   if (!qualified) {
-    return { qualified: false, reason, category, confidence, metadata: null };
+    return { qualified: false, reason, category, confidence, metadata: null, inferredCountry };
   }
 
   return {
@@ -221,6 +227,7 @@ function parseStage2Response(rawText: string): QualifierOutput {
     category,
     confidence,
     metadata: parseMetadataFromModel(obj.metadata),
+    inferredCountry,
   };
 }
 
@@ -284,6 +291,7 @@ export class IgCoachQualifier {
         stage: 1,
         urlFetchAttempted: false,
         urlFetchSucceeded: null,
+        inferredCountry: stage1.inferredCountry,
       };
     }
 
@@ -297,6 +305,7 @@ export class IgCoachQualifier {
         stage: 1,
         urlFetchAttempted: false,
         urlFetchSucceeded: null,
+        inferredCountry: stage1.inferredCountry,
       };
     }
 
@@ -346,10 +355,15 @@ export class IgCoachQualifier {
     const raw = extractAnthropicText(response);
     const parsed = parseStage2Response(raw);
     return {
-      ...parsed,
+      qualified: parsed.qualified,
+      reason: parsed.reason,
+      category: parsed.category,
+      confidence: parsed.confidence,
+      metadata: parsed.metadata,
       stage: 2,
       urlFetchAttempted: input.externalUrl !== null,
       urlFetchSucceeded,
+      inferredCountry: parsed.inferredCountry,
     };
   }
 }

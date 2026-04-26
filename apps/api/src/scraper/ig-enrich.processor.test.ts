@@ -235,6 +235,7 @@ describe('IgEnrichProcessor', () => {
       reason: 'ok',
       category: 'coach',
       confidence: 'high',
+      inferredCountry: 'US',
       metadata: { personName: 'Jane Doe', businessName: 'Jane Coaching' },
       stage: 2,
       urlFetchAttempted: true,
@@ -254,6 +255,7 @@ describe('IgEnrichProcessor', () => {
         aiQualificationStage: 2,
         aiUrlFetchAttempted: true,
         aiUrlFetchSucceeded: true,
+        aiInferredCountry: 'US',
       }),
     });
     expect(prisma.igCandidateProfile.update).toHaveBeenCalledWith({
@@ -295,6 +297,7 @@ describe('IgEnrichProcessor', () => {
       reason: 'no',
       category: 'other',
       confidence: 'high',
+      inferredCountry: null,
       metadata: null,
       stage: 1,
       urlFetchAttempted: false,
@@ -385,6 +388,7 @@ describe('IgEnrichProcessor', () => {
       reason: 'ok',
       category: 'coach',
       confidence: 'high',
+      inferredCountry: null,
       metadata: { personName: 'Jane Doe', businessName: 'Jane Coaching' },
       stage: 1,
       urlFetchAttempted: false,
@@ -399,6 +403,110 @@ describe('IgEnrichProcessor', () => {
     expect(prisma.igCandidateProfile.update).toHaveBeenCalledWith({
       where: { id: 'c1' },
       data: { status: 'ENRICHED', enrichedAt: expect.any(Date) },
+    });
+  });
+
+  it('Qualified + inferredCountry outside allowlist -> DQ, no KnownAdvertiser, candidate marked ENRICHED', async () => {
+    (prisma.igCandidateProfile.findUnique as any).mockResolvedValue({
+      id: 'c1',
+      instagramHandle: 'somehandle',
+      status: 'PENDING_ENRICHMENT',
+      discoveryChannel: 'APIFY_FB_ADS',
+    });
+
+    mockBrightDataOnce(
+      vi.fn(async () => [
+        {
+          account: 'somehandle',
+          full_name: 'Jane Doe',
+          profile_name: 'Jane Coaching',
+          followers: 1,
+          posts_count: 1,
+          is_verified: false,
+          is_business_account: false,
+          is_private: false,
+          biography: 'bio',
+          external_url: 'https://www.example.com/offer',
+          profile_url: 'https://www.instagram.com/somehandle/',
+          business_category_name: null,
+          category_name: null,
+        },
+      ]),
+    );
+    (prisma.knownAdvertiser.findFirst as any).mockResolvedValue(null);
+
+    const qualify = vi.fn(async () => ({
+      qualified: true,
+      reason: 'ok',
+      category: 'coach',
+      confidence: 'high',
+      inferredCountry: 'IN',
+      metadata: { personName: 'Jane Doe', businessName: 'Jane Coaching' },
+      stage: 2,
+      urlFetchAttempted: true,
+      urlFetchSucceeded: true,
+    }));
+    mockQualifierOnce(qualify);
+
+    const p = new IgEnrichProcessor();
+    await p.process(mkJob({ candidateId: 'c1' }));
+
+    expect(prisma.knownAdvertiser.create).not.toHaveBeenCalled();
+    expect(prisma.igCandidateProfile.update).toHaveBeenCalledWith({
+      where: { id: 'c1' },
+      data: { status: 'ENRICHED', enrichedAt: expect.any(Date) },
+    });
+  });
+
+  it('Qualified + inferredCountry null -> permissive, inserts KnownAdvertiser with aiInferredCountry=null', async () => {
+    (prisma.igCandidateProfile.findUnique as any).mockResolvedValue({
+      id: 'c1',
+      instagramHandle: 'somehandle',
+      status: 'PENDING_ENRICHMENT',
+      discoveryChannel: 'APIFY_FB_ADS',
+    });
+
+    mockBrightDataOnce(
+      vi.fn(async () => [
+        {
+          account: 'somehandle',
+          full_name: 'Jane Doe',
+          profile_name: 'Jane Coaching',
+          followers: 1,
+          posts_count: 1,
+          is_verified: false,
+          is_business_account: false,
+          is_private: false,
+          biography: 'bio',
+          external_url: 'https://www.example.com/offer',
+          profile_url: 'https://www.instagram.com/somehandle/',
+          business_category_name: null,
+          category_name: null,
+        },
+      ]),
+    );
+    (prisma.knownAdvertiser.findFirst as any).mockResolvedValue(null);
+
+    const qualify = vi.fn(async () => ({
+      qualified: true,
+      reason: 'ok',
+      category: 'coach',
+      confidence: 'high',
+      inferredCountry: null,
+      metadata: { personName: 'Jane Doe', businessName: 'Jane Coaching' },
+      stage: 2,
+      urlFetchAttempted: true,
+      urlFetchSucceeded: true,
+    }));
+    mockQualifierOnce(qualify);
+
+    const p = new IgEnrichProcessor();
+    await p.process(mkJob({ candidateId: 'c1' }));
+
+    expect(prisma.knownAdvertiser.create).toHaveBeenCalledWith({
+      data: expect.objectContaining({
+        aiInferredCountry: null,
+      }),
     });
   });
 });

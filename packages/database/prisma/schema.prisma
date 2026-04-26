@@ -291,6 +291,7 @@ model KnownAdvertiser {
   aiUniqueAngle             String?
   aiSocialProof             String?
   aiToneSignals             String?
+  aiInferredCountry         String?
 
   lastTraversedAt    DateTime?
 

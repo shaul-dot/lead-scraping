@@ -13,6 +13,8 @@ import { isPlatformDomain } from '../../../../packages/adapters/src/utils/platfo
 
 const logger = createLogger('ig-enrich-processor');
 
+const ALLOWED_COUNTRIES = new Set(['US', 'GB', 'AU', 'CA']);
+
 export interface IgEnrichJobData {
   candidateId: string; // IgCandidateProfile.id
 }
@@ -178,6 +180,27 @@ export class IgEnrichProcessor extends WorkerHost {
 
     // Step 6: If qualified, insert into KnownAdvertiser (use same mapping style as FB qualification service)
     if (qualifierResult.qualified) {
+      // Permissive country filter: DQ only if country is clearly outside allowlist
+      if (qualifierResult.inferredCountry && !ALLOWED_COUNTRIES.has(qualifierResult.inferredCountry)) {
+        logger.info(
+          {
+            candidateId,
+            handle: candidate.instagramHandle,
+            inferredCountry: qualifierResult.inferredCountry,
+          },
+          'DQ: country outside allowlist',
+        );
+
+        await prisma.igCandidateProfile.update({
+          where: { id: candidateId },
+          data: {
+            status: 'ENRICHED',
+            enrichedAt: new Date(),
+          },
+        });
+        return;
+      }
+
       const personName = qualifierResult.metadata?.personName ?? profile.full_name ?? null;
       const businessName = qualifierResult.metadata?.businessName ?? profile.profile_name ?? null;
       const firstName = personName?.trim().split(/\s+/)[0] ?? null;
@@ -214,6 +237,7 @@ export class IgEnrichProcessor extends WorkerHost {
             aiUniqueAngle: qualifierResult.metadata?.uniqueAngle ?? null,
             aiSocialProof: qualifierResult.metadata?.socialProof ?? null,
             aiToneSignals: qualifierResult.metadata?.toneSignals ?? null,
+            aiInferredCountry: qualifierResult.inferredCountry ?? null,
           },
         });
 

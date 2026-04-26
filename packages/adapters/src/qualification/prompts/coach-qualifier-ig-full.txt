@@ -9,6 +9,7 @@ Reply with exactly this JSON structure and nothing else:
   "reason": "one sentence explaining the decision",
   "category": "coach" | "consultant" | "course_creator" | "expert" | "agency" | "therapist_practitioner" | "membership_community" | "product_brand" | "saas_app" | "local_service" | "media" | "affiliate" | "non_commercial" | "enterprise_b2b" | "regulated_financial" | "service_delivery_agency" | "other",
   "confidence": "high" | "medium" | "low",
+  "inferredCountry": string | null,
   "metadata": null | {
     "person_name": string | null,
     "business_name": string | null,
@@ -139,6 +140,23 @@ If external URL fetch failed or returned no useful content, base decision on bio
 ## METADATA EXTRACTION (qualified: true only)
 
 Extract descriptive facts only. Do not write marketing copy. Do not fabricate. Leave fields null when uncertain.
+
+## COUNTRY DETECTION
+Try to infer the user's country from these signals (bio + external URL content):
+- Location text in bio (e.g., "📍Sydney", "Based in NYC", "London-based")
+- Country-specific TLD on external_url (.com.au, .co.uk, .ca, .in, .za, .ng)
+- Currency mentions (£, A$, ₹)
+- Phone number country codes
+- Cultural or language markers (e.g., distinctive UK/AU spelling)
+
+Output `inferredCountry` as ISO-3166 alpha-2 code when country is clearly identifiable:
+- US (United States)
+- GB (United Kingdom — note: GB, not UK)
+- AU (Australia)
+- CA (Canada)
+- Or any other code if detected (IN, ZA, NG, IE, NZ, etc.)
+
+If you can't reliably infer the country, output `null`. Don't guess from name patterns alone.
 
 ## INPUT FORMAT
 You will receive Instagram profile data + external URL content in this format:

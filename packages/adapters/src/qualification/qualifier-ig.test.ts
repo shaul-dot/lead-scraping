@@ -33,6 +33,7 @@ describe('IgCoachQualifier (2-stage)', () => {
       reason: 'Clear coach bio.',
       category: 'coach',
       confidence: 'high',
+      inferredCountry: 'US',
       metadata: {
         person_name: 'Test',
         business_name: 'Test Coaching',
@@ -52,6 +53,7 @@ describe('IgCoachQualifier (2-stage)', () => {
     const out = await q.qualify(baseInput);
     expect(out.stage).toBe(1);
     expect(out.qualified).toBe(true);
+    expect(out.inferredCountry).toBe('US');
     expect(out.urlFetchAttempted).toBe(false);
     expect(out.urlFetchSucceeded).toBeNull();
     expect(fetchUrlContent).not.toHaveBeenCalled();
@@ -63,6 +65,7 @@ describe('IgCoachQualifier (2-stage)', () => {
       reason: 'Private account.',
       category: 'other',
       confidence: 'high',
+      inferredCountry: null,
       metadata: null,
     });
     const anthropic = mkAnthropicWithText(stage1);
@@ -72,6 +75,7 @@ describe('IgCoachQualifier (2-stage)', () => {
     const out = await q.qualify({ ...baseInput, isPrivate: true });
     expect(out.stage).toBe(1);
     expect(out.qualified).toBe(false);
+    expect(out.inferredCountry).toBeNull();
     expect(out.urlFetchAttempted).toBe(false);
     expect(out.urlFetchSucceeded).toBeNull();
     expect(fetchUrlContent).not.toHaveBeenCalled();
@@ -83,6 +87,7 @@ describe('IgCoachQualifier (2-stage)', () => {
       reason: 'Not enough signal.',
       category: null,
       confidence: 'low',
+      inferredCountry: null,
       metadata: null,
     });
     const stage2 = JSON.stringify({
@@ -90,6 +95,7 @@ describe('IgCoachQualifier (2-stage)', () => {
       reason: 'Program found on external URL.',
       category: 'course_creator',
       confidence: 'medium',
+      inferredCountry: 'GB',
       metadata: {
         person_name: null,
         business_name: 'Example',
@@ -117,6 +123,7 @@ describe('IgCoachQualifier (2-stage)', () => {
     const out = await q.qualify(baseInput);
     expect(out.stage).toBe(2);
     expect(out.qualified).toBe(true);
+    expect(out.inferredCountry).toBe('GB');
     expect(out.urlFetchAttempted).toBe(true);
     expect(out.urlFetchSucceeded).toBe(true);
     expect(fetchUrlContent).toHaveBeenCalledTimes(1);
@@ -128,6 +135,7 @@ describe('IgCoachQualifier (2-stage)', () => {
       reason: 'Unclear.',
       category: null,
       confidence: 'low',
+      inferredCountry: null,
       metadata: null,
     });
     const stage2 = JSON.stringify({
@@ -135,6 +143,7 @@ describe('IgCoachQualifier (2-stage)', () => {
       reason: 'Could not verify offer.',
       category: 'other',
       confidence: 'low',
+      inferredCountry: null,
       metadata: null,
     });
 
@@ -153,6 +162,7 @@ describe('IgCoachQualifier (2-stage)', () => {
     const q = new IgCoachQualifier(anthropic, fetchUrlContent);
     const out = await q.qualify(baseInput);
     expect(out.stage).toBe(2);
+    expect(out.inferredCountry).toBeNull();
     expect(out.urlFetchAttempted).toBe(true);
     expect(out.urlFetchSucceeded).toBe(false);
   });
@@ -163,6 +173,7 @@ describe('IgCoachQualifier (2-stage)', () => {
       reason: 'Unclear.',
       category: null,
       confidence: 'low',
+      inferredCountry: null,
       metadata: null,
     });
     const stage2 = JSON.stringify({
@@ -170,6 +181,7 @@ describe('IgCoachQualifier (2-stage)', () => {
       reason: 'No external info.',
       category: 'other',
       confidence: 'low',
+      inferredCountry: null,
       metadata: null,
     });
 
@@ -186,6 +198,7 @@ describe('IgCoachQualifier (2-stage)', () => {
     const q = new IgCoachQualifier(anthropic, fetchUrlContent);
     const out = await q.qualify({ ...baseInput, externalUrl: null });
     expect(out.stage).toBe(2);
+    expect(out.inferredCountry).toBeNull();
     expect(out.urlFetchAttempted).toBe(false);
     expect(out.urlFetchSucceeded).toBeNull();
     expect(fetchUrlContent).not.toHaveBeenCalled();
