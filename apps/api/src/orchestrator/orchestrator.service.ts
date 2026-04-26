@@ -39,6 +39,11 @@ const SOURCE_TO_QUEUE: Record<string, string> = {
   INSTAGRAM: 'scrape-instagram',
 };
 
+// Depth-aware scrape strategy.
+// Deep scrape used on first encounter to maximize TAM coverage; shallow on follow-ups to catch deltas.
+const DEEP_SCRAPE_MAX_RESULTS = 500; // Actor cap unknown; start conservative.
+const SHALLOW_SCRAPE_MAX_RESULTS = 100;
+
 const SCHEDULE_CACHE_KEY = 'schedule_config';
 
 const DEFAULT_CONFIG: ScheduleConfig = {
@@ -185,13 +190,30 @@ export class OrchestratorService {
       const baseCount = Math.ceil((config.dailyTarget * weight) / 100 / 100);
       const adjustedCount = Math.max(1, Math.round(baseCount * (1 + volumeAdjustmentPct / 100)));
 
-      const topKeywords = await this.combinator.pickNextSearchBatch(adjustedCount);
+      const entries = await this.combinator.pickNextSearchBatch(adjustedCount);
       const queueName = SOURCE_TO_QUEUE[src];
 
-      const maxResults = parsePositiveIntEnv('SCRAPE_MAX_RESULTS', 30);
-      const jobs = topKeywords.map((kw) => ({
-        data: { keyword: kw.query, maxResults },
-      }));
+      const queries = entries.map((e) => e.query);
+      const statsRows = queries.length
+        ? await prisma.scrapeQueryStats.findMany({
+            where: { query: { in: queries } },
+            select: { query: true, totalAdsScraped: true, isStale: true },
+          })
+        : [];
+      const statsByQuery = new Map(statsRows.map((r) => [r.query, r]));
+
+      const jobs = [];
+      for (const entry of entries) {
+        const stats = statsByQuery.get(entry.query);
+        const isFirstScrape = !stats || stats.totalAdsScraped === 0;
+        const isStale = stats?.isStale === true;
+        if (isStale) {
+          logger.warn({ query: entry.query }, 'Skipping stale query');
+          continue;
+        }
+        const maxResults = isFirstScrape ? DEEP_SCRAPE_MAX_RESULTS : SHALLOW_SCRAPE_MAX_RESULTS;
+        jobs.push({ data: { keyword: entry.query, maxResults } });
+      }
 
       if (jobs.length > 0) {
         await this.queue.addBulk(queueName, jobs);
@@ -254,13 +276,30 @@ export class OrchestratorService {
 
     for (const src of SOURCES) {
       const keywordCount = parsePositiveIntEnv('SCRAPE_KEYWORDS_PER_RUN', 5);
-      const topKeywords = await this.combinator.pickNextSearchBatch(keywordCount);
+      const entries = await this.combinator.pickNextSearchBatch(keywordCount);
       const queueName = SOURCE_TO_QUEUE[src];
 
-      const maxResults = parsePositiveIntEnv('SCRAPE_MAX_RESULTS', 30);
-      const jobs = topKeywords.map((kw) => ({
-        data: { keyword: kw.query, maxResults },
-      }));
+      const queries = entries.map((e) => e.query);
+      const statsRows = queries.length
+        ? await prisma.scrapeQueryStats.findMany({
+            where: { query: { in: queries } },
+            select: { query: true, totalAdsScraped: true, isStale: true },
+          })
+        : [];
+      const statsByQuery = new Map(statsRows.map((r) => [r.query, r]));
+
+      const jobs = [];
+      for (const entry of entries) {
+        const stats = statsByQuery.get(entry.query);
+        const isFirstScrape = !stats || stats.totalAdsScraped === 0;
+        const isStale = stats?.isStale === true;
+        if (isStale) {
+          logger.warn({ query: entry.query }, 'Skipping stale query');
+          continue;
+        }
+        const maxResults = isFirstScrape ? DEEP_SCRAPE_MAX_RESULTS : SHALLOW_SCRAPE_MAX_RESULTS;
+        jobs.push({ data: { keyword: entry.query, maxResults } });
+      }
 
       if (jobs.length > 0) {
         await this.queue.addBulk(queueName, jobs);

@@ -319,6 +319,41 @@ export class FacebookAdsProcessor extends WorkerHost {
       'Facebook Ads scrape job completed',
     );
 
+    // Per-query (combined or identity) scrape stats tracking. Non-fatal.
+    try {
+      const totalFetched = result.metadata.leadsFound ?? result.leads.length;
+      const newAdvertisers = advertisersCreated;
+
+      const existingStats = await prisma.scrapeQueryStats.findUnique({
+        where: { query: keyword },
+        select: { consecutiveZeroYieldRuns: true },
+      });
+
+      const newConsecutiveZeros =
+        newAdvertisers === 0 ? (existingStats?.consecutiveZeroYieldRuns ?? 0) + 1 : 0;
+      const shouldMarkStale = newConsecutiveZeros >= 3;
+
+      await prisma.scrapeQueryStats.upsert({
+        where: { query: keyword },
+        create: {
+          query: keyword,
+          totalAdsScraped: totalFetched,
+          totalNewAdvertisers: newAdvertisers,
+          consecutiveZeroYieldRuns: newConsecutiveZeros,
+          isStale: shouldMarkStale,
+        },
+        update: {
+          lastScrapedAt: new Date(),
+          totalAdsScraped: { increment: totalFetched },
+          totalNewAdvertisers: { increment: newAdvertisers },
+          consecutiveZeroYieldRuns: newConsecutiveZeros,
+          isStale: shouldMarkStale,
+        },
+      });
+    } catch (err) {
+      logger.warn({ jobId: job.id, keyword, err }, 'Failed to upsert ScrapeQueryStats (non-fatal)');
+    }
+
     return {
       keyword,
       totalFetched: result.metadata.leadsFound,

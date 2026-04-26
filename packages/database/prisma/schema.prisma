@@ -314,8 +314,29 @@ model Keyword {
   patternHint   String?
   notes         String?
 
+  firstScrapedAt            DateTime?
+  lastScrapedAt             DateTime?
+  totalAdsScraped           Int       @default(0)
+  totalNewAdvertisers       Int       @default(0)
+  consecutiveZeroYieldRuns  Int       @default(0)
+
   @@index([patternHint])
   @@index([category])
+}
+
+model ScrapeQueryStats {
+  id                       String   @id @default(cuid())
+  query                    String   @unique
+  firstScrapedAt           DateTime @default(now())
+  lastScrapedAt            DateTime @default(now())
+  totalAdsScraped          Int      @default(0)
+  totalNewAdvertisers      Int      @default(0)
+  consecutiveZeroYieldRuns Int      @default(0)
+  isStale                  Boolean  @default(false)
+
+  @@index([query])
+  @@index([lastScrapedAt])
+  @@index([isStale])
 }
 
 model Campaign {
