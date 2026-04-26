@@ -110,7 +110,10 @@ export class IgGoogleNicheService {
     });
 
     // Step C: Build queries
-    const queries = keywords.map((k) => `site:instagram.com "${k.primary}"`);
+    const queries = keywords.map(
+      (k) =>
+        `site:instagram.com -inurl:/p/ -inurl:/reel/ -inurl:/explore/ -inurl:/stories/ "${k.primary}"`,
+    );
 
     // Step D: Run Google SERP via Bright Data
     let results: any[] = [];
