@@ -93,6 +93,13 @@ enum EnrichmentStatus {
   DEAD
 }
 
+enum VaReviewStatus {
+  UNREVIEWED
+  IS_ICP
+  NOT_ICP
+  BORDERLINE
+}
+
 model Lead {
   id                    String   @id @default(cuid())
   source                Source
@@ -235,11 +242,13 @@ model KnownAdvertiser {
   enrichmentStatus   EnrichmentStatus @default(NEEDS_ENRICHMENT)
   enrichmentNotes    String?
   importedAt         DateTime @default(now())
+  vaReview           VaReviewStatus @default(UNREVIEWED)
 
   @@index([websiteDomain])
   @@index([facebookPageId])
   @@index([fullName])
   @@index([enrichmentStatus])
+  @@index([vaReview])
 }
 
 model Remediation {
