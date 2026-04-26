@@ -22,6 +22,11 @@ import { IgGoogleAggregatorService } from './ig-google-aggregator.service';
     IgGoogleFunnelService,
     IgGoogleAggregatorService,
   ],
-  exports: [InstagramScraperService],
+  exports: [
+    InstagramScraperService,
+    IgGoogleNicheService,
+    IgGoogleFunnelService,
+    IgGoogleAggregatorService,
+  ],
 })
 export class ScraperModule {}

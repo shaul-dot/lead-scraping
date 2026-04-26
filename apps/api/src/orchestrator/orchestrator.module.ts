@@ -8,9 +8,18 @@ import { KeywordModule } from '../keyword/keyword.module';
 import { DeliverabilityModule } from '../deliverability/deliverability.module';
 import { RemediationModule } from '../remediation/remediation.module';
 import { KeywordCombinatorService } from '../scraper/keyword-combinator.service';
+import { ScraperModule } from '../scraper/scraper.module';
 
 @Module({
-  imports: [QueueModule, BudgetModule, SourceModule, KeywordModule, DeliverabilityModule, RemediationModule],
+  imports: [
+    QueueModule,
+    BudgetModule,
+    SourceModule,
+    KeywordModule,
+    DeliverabilityModule,
+    RemediationModule,
+    ScraperModule,
+  ],
   providers: [OrchestratorService, KeywordCombinatorService],
   controllers: [ScheduleController],
   exports: [OrchestratorService],

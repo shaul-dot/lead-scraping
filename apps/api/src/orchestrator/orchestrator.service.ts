@@ -10,6 +10,9 @@ import { ReputationMonitorService } from '../deliverability/reputation-monitor.s
 import { RotationService } from '../deliverability/rotation.service';
 import { RemediationService } from '../remediation/remediation.service';
 import { KeywordCombinatorService } from '../scraper/keyword-combinator.service';
+import { IgGoogleNicheService } from '../scraper/ig-google-niche.service';
+import { IgGoogleFunnelService } from '../scraper/ig-google-funnel.service';
+import { IgGoogleAggregatorService } from '../scraper/ig-google-aggregator.service';
 import {
   morningAssessment,
   middayCheck,
@@ -24,6 +27,7 @@ import type { ScheduleConfig } from './schedule.controller';
 const logger = createLogger('orchestrator');
 
 const SCRAPE_CRON = process.env.SCRAPE_CRON_SCHEDULE ?? '0 */3 * * *';
+const IG_CRON = process.env.IG_CRON_SCHEDULE ?? '0 */3 * * *';
 const CMO_CRON = process.env.CMO_CRON_SCHEDULE ?? '0 6 * * *';
 
 function parsePositiveIntEnv(name: string, fallback: number): number {
@@ -69,16 +73,125 @@ export class OrchestratorService {
     private readonly reputationMonitor: ReputationMonitorService,
     private readonly rotation: RotationService,
     private readonly remediation: RemediationService,
+    private readonly igGoogleNicheService: IgGoogleNicheService,
+    private readonly igGoogleFunnelService: IgGoogleFunnelService,
+    private readonly igGoogleAggregatorService: IgGoogleAggregatorService,
   ) {
     logger.info(
       {
         scrapeCron: SCRAPE_CRON,
+        igCron: IG_CRON,
         cmoCron: CMO_CRON,
         maxResults: process.env.SCRAPE_MAX_RESULTS ?? '30',
         keywordsPerRun: process.env.SCRAPE_KEYWORDS_PER_RUN ?? '5',
       },
       'OrchestratorService initialized with schedule config',
     );
+  }
+
+  async runIgPipelineCycle(): Promise<{
+    channel2: { keywordsUsed: number; candidatesEnqueued: number; candidatesSkippedDuplicates: number };
+    channel3: { combinationsUsed: number; candidatesEnqueued: number; candidatesSkippedDuplicates: number };
+    channel4: {
+      keywordsUsed: number;
+      candidatesEnqueued: number;
+      candidatesSkippedDuplicates: number;
+      handlesExtractedNone: number;
+    };
+  }> {
+    if (process.env.IG_PIPELINE_ENABLED === 'false') {
+      logger.info('IG pipeline disabled via IG_PIPELINE_ENABLED=false, skipping cycle');
+      return {
+        channel2: { keywordsUsed: 0, candidatesEnqueued: 0, candidatesSkippedDuplicates: 0 },
+        channel3: { combinationsUsed: 0, candidatesEnqueued: 0, candidatesSkippedDuplicates: 0 },
+        channel4: {
+          keywordsUsed: 0,
+          candidatesEnqueued: 0,
+          candidatesSkippedDuplicates: 0,
+          handlesExtractedNone: 0,
+        },
+      };
+    }
+
+    logger.info('Starting IG pipeline cycle');
+
+    const c2Count = parsePositiveIntEnv('IG_CHANNEL_2_KEYWORDS_PER_CYCLE', 3);
+    const c3Count = parsePositiveIntEnv('IG_CHANNEL_3_COMBINATIONS_PER_CYCLE', 3);
+    const c4Count = parsePositiveIntEnv('IG_CHANNEL_4_KEYWORDS_PER_CYCLE', 2);
+
+    const [c2Result, c3Result, c4Result] = await Promise.allSettled([
+      this.igGoogleNicheService.runOneCycle(c2Count),
+      this.igGoogleFunnelService.runOneCycle(c3Count),
+      this.igGoogleAggregatorService.runOneCycle(c4Count),
+    ]);
+
+    if (c2Result.status === 'rejected') {
+      const message = c2Result.reason instanceof Error ? c2Result.reason.message : String(c2Result.reason);
+      logger.error({ err: message }, 'IG Channel 2 failed');
+    }
+    if (c3Result.status === 'rejected') {
+      const message = c3Result.reason instanceof Error ? c3Result.reason.message : String(c3Result.reason);
+      logger.error({ err: message }, 'IG Channel 3 failed');
+    }
+    if (c4Result.status === 'rejected') {
+      const message = c4Result.reason instanceof Error ? c4Result.reason.message : String(c4Result.reason);
+      logger.error({ err: message }, 'IG Channel 4 failed');
+    }
+
+    const c2 =
+      c2Result.status === 'fulfilled'
+        ? c2Result.value
+        : { keywordsUsed: 0, candidatesEnqueued: 0, candidatesSkippedDuplicates: 0 };
+    const c3 =
+      c3Result.status === 'fulfilled'
+        ? c3Result.value
+        : { combinationsUsed: 0, candidatesEnqueued: 0, candidatesSkippedDuplicates: 0 };
+    const c4 =
+      c4Result.status === 'fulfilled'
+        ? c4Result.value
+        : {
+            keywordsUsed: 0,
+            totalQueries: 0,
+            totalResultsReturned: 0,
+            candidatesEnqueued: 0,
+            candidatesSkippedDuplicates: 0,
+            handlesExtractedNone: 0,
+          };
+
+    logger.info({ channel2: c2, channel3: c3, channel4: c4 }, 'IG pipeline cycle complete');
+
+    return {
+      channel2: {
+        keywordsUsed: (c2 as any).keywordsUsed ?? 0,
+        candidatesEnqueued: (c2 as any).candidatesEnqueued ?? 0,
+        candidatesSkippedDuplicates: (c2 as any).candidatesSkippedDuplicates ?? 0,
+      },
+      channel3: {
+        combinationsUsed: (c3 as any).combinationsUsed ?? 0,
+        candidatesEnqueued: (c3 as any).candidatesEnqueued ?? 0,
+        candidatesSkippedDuplicates: (c3 as any).candidatesSkippedDuplicates ?? 0,
+      },
+      channel4: {
+        keywordsUsed: (c4 as any).keywordsUsed ?? 0,
+        candidatesEnqueued: (c4 as any).candidatesEnqueued ?? 0,
+        candidatesSkippedDuplicates: (c4 as any).candidatesSkippedDuplicates ?? 0,
+        handlesExtractedNone: (c4 as any).handlesExtractedNone ?? 0,
+      },
+    };
+  }
+
+  @Cron(IG_CRON, {
+    name: 'ig-pipeline-cycle',
+    timeZone: 'UTC',
+  })
+  async handleIgPipelineCron(): Promise<void> {
+    try {
+      const result = await this.runIgPipelineCycle();
+      logger.info({ result }, 'IG cron cycle finished');
+    } catch (e) {
+      const message = e instanceof Error ? e.message : String(e);
+      logger.error({ err: message }, 'IG cron cycle failed');
+    }
   }
 
   // -------------------------------------------------------------------------
