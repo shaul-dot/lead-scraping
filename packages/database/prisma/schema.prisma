@@ -392,6 +392,21 @@ model Keyword {
   @@index([category])
 }
 
+model Hashtag {
+  id          String   @id @default(cuid())
+  hashtag     String   @unique
+  category    String?
+  tier        Int?
+  notes       String?
+  enabled     Boolean  @default(true)
+  lastUsedAt  DateTime?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([enabled, lastUsedAt])
+  @@index([category])
+}
+
 model ScrapeQueryStats {
   id                       String   @id @default(cuid())
   query                    String   @unique
