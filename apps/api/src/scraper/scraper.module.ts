@@ -6,6 +6,7 @@ import { FacebookAdsProcessor } from './facebook-ads.processor';
 import { StatsModule } from '../stats/stats.module';
 import { IgEnrichProcessor } from './ig-enrich.processor';
 import { IgGraphTraversalService } from './ig-graph-traversal.service';
+import { IgGoogleNicheService } from './ig-google-niche.service';
 
 @Module({
   imports: [QueueModule, StatsModule],
@@ -15,6 +16,7 @@ import { IgGraphTraversalService } from './ig-graph-traversal.service';
     FacebookAdsProcessor,
     IgEnrichProcessor,
     IgGraphTraversalService,
+    IgGoogleNicheService,
   ],
   exports: [InstagramScraperService],
 })
