@@ -54,8 +54,20 @@ describe('BrightDataClient', () => {
     const fetchMock = mockFetchSequence([
       { body: { snapshot_id: 'snap_1' } }, // trigger
       { body: { status: 'running' } }, // progress 1
-      { body: { status: 'ready', records_count: 2 } }, // progress 2
-      { body: [{ a: 1 }, { a: 2 }] }, // download
+      { body: { status: 'ready', records_count: 1 } }, // progress 2
+      {
+        body: [
+          {
+            url: 'https://www.google.com/search?q=x',
+            keyword: null,
+            organic: [
+              { url: 'u', rank: 1, link: 'l1', title: 't1', description: null },
+              { url: 'u', rank: 2, link: 'l2', title: 't2', description: 'd2' },
+            ],
+            timestamp: '2026-01-01T00:00:00Z',
+          },
+        ],
+      }, // download
     ]);
     vi.stubGlobal('fetch', fetchMock as any);
 
@@ -63,7 +75,10 @@ describe('BrightDataClient', () => {
     const p = client.googleSearch(['q']);
     await vi.advanceTimersByTimeAsync(10);
     const out = await p;
-    expect(out).toEqual([{ a: 1 }, { a: 2 }]);
+    expect(out).toEqual([
+      { url: 'u', rank: 1, link: 'l1', title: 't1', description: null },
+      { url: 'u', rank: 2, link: 'l2', title: 't2', description: 'd2' },
+    ]);
   });
 
   it('waitForSnapshot throws on failed status', async () => {
@@ -116,26 +131,51 @@ describe('BrightDataClient', () => {
     const fetchMock = mockFetchSequence([
       { body: { snapshot_id: 'snap_1' } },
       { body: { status: 'ready', records_count: 2 } },
-      { body: '{"a":1}\n{"a":2}\n' },
+      {
+        body:
+          '{"url":"https://www.google.com/search?q=x","keyword":null,"organic":[{"url":"u","rank":1,"link":"l1","title":"t1","description":null}],"timestamp":"2026-01-01T00:00:00Z"}\n' +
+          '{"url":"https://www.google.com/search?q=y","keyword":null,"organic":[{"url":"u2","rank":1,"link":"l2","title":"t2","description":"d2"}],"timestamp":"2026-01-01T00:00:00Z"}\n',
+      },
     ]);
     vi.stubGlobal('fetch', fetchMock as any);
 
     const client = new BrightDataClient({ apiToken: 'token', pollIntervalMs: 1, maxPollAttempts: 2 });
     const out = await client.googleSearch(['q']);
-    expect(out).toEqual([{ a: 1 }, { a: 2 }]);
+    expect(out).toEqual([
+      { url: 'u', rank: 1, link: 'l1', title: 't1', description: null },
+      { url: 'u2', rank: 1, link: 'l2', title: 't2', description: 'd2' },
+    ]);
   });
 
   it('parses JSON array snapshot responses', async () => {
     const fetchMock = mockFetchSequence([
       { body: { snapshot_id: 'snap_1' } },
       { body: { status: 'ready', records_count: 2 } },
-      { body: '[{\"a\":1},{\"a\":2}]' },
+      {
+        body: JSON.stringify([
+          {
+            url: 'https://www.google.com/search?q=x',
+            keyword: null,
+            organic: [{ url: 'u', rank: 1, link: 'l1', title: 't1', description: null }],
+            timestamp: '2026-01-01T00:00:00Z',
+          },
+          {
+            url: 'https://www.google.com/search?q=y',
+            keyword: null,
+            organic: [{ url: 'u2', rank: 1, link: 'l2', title: 't2', description: 'd2' }],
+            timestamp: '2026-01-01T00:00:00Z',
+          },
+        ]),
+      },
     ]);
     vi.stubGlobal('fetch', fetchMock as any);
 
     const client = new BrightDataClient({ apiToken: 'token', pollIntervalMs: 1, maxPollAttempts: 2 });
     const out = await client.googleSearch(['q']);
-    expect(out).toEqual([{ a: 1 }, { a: 2 }]);
+    expect(out).toEqual([
+      { url: 'u', rank: 1, link: 'l1', title: 't1', description: null },
+      { url: 'u2', rank: 1, link: 'l2', title: 't2', description: 'd2' },
+    ]);
   });
 });
 

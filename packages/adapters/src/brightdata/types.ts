@@ -45,12 +45,33 @@ export interface BrightDataRelatedAccount {
 }
 
 export interface BrightDataGoogleResult {
-  query: string;
   url: string;
-  title: string | null;
-  description: string | null;
   rank: number;
+  link: string;
+  title: string;
+  description: string | null;
+}
+
+export interface BrightDataSerpOrganicResult extends BrightDataGoogleResult {}
+
+export interface BrightDataSerpRecord {
+  url: string;
+  keyword: string | null;
+  general?: unknown;
+  organic?: BrightDataSerpOrganicResult[] | null;
+  people_also_ask?: unknown;
+  related?: unknown;
+  navigation?: unknown;
+  local_pack?: unknown;
+  pagination?: unknown;
+  aio_text?: string | null;
+  aio_citations?: unknown;
+  page_html?: string | null;
   timestamp: string;
+  input?: { url?: string } | null;
+  country?: string | null;
+  language?: string | null;
+  index?: number | null;
 }
 
 export type BrightDataSnapshotStatus =

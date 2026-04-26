@@ -3,6 +3,7 @@ import type {
   BrightDataInstagramProfile,
   BrightDataGoogleResult,
   BrightDataSnapshotProgress,
+  BrightDataSerpRecord,
 } from './types';
 import { BrightDataError } from './types';
 
@@ -34,7 +35,7 @@ export class BrightDataClient {
     this.googleDatasetId =
       opts.googleDatasetId ??
       process.env.BRIGHT_DATA_GOOGLE_DATASET_ID ??
-      'gd_m8ebnr0q2qlklc02fz';
+      'gd_mfz5x93lmsjjjylob';
     this.pollIntervalMs = opts.pollIntervalMs ?? 10_000;
     this.maxPollAttempts = opts.maxPollAttempts ?? 60;
   }
@@ -172,7 +173,12 @@ export class BrightDataClient {
   }
 
   async waitForGoogleResults(snapshotId: string): Promise<BrightDataGoogleResult[]> {
-    return this.waitForSnapshot<BrightDataGoogleResult>(snapshotId);
+    const records = await this.waitForSnapshot<BrightDataSerpRecord>(snapshotId);
+    const out: BrightDataGoogleResult[] = [];
+    for (const r of records) {
+      for (const o of r.organic ?? []) out.push(o);
+    }
+    return out;
   }
 
   async googleSearch(queries: string[]): Promise<BrightDataGoogleResult[]> {
