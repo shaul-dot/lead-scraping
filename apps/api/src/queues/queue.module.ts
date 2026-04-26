@@ -6,6 +6,7 @@ import type { QueueName } from '@hyperscale/types';
 const ALL_QUEUES: QueueName[] = [
   'scrape-facebook',
   'scrape-instagram',
+  'enrich-ig-candidate',
   'enrich',
   'score',
   'dedup',

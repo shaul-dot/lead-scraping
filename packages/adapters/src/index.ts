@@ -42,3 +42,10 @@ export {
   type QualifierOfferingType,
   type QualifierOutput,
 } from './qualification/index';
+
+export { BrightDataClient } from './brightdata/index';
+export type {
+  BrightDataInstagramProfile,
+  BrightDataGoogleResult,
+  BrightDataRelatedAccount,
+} from './brightdata/index';

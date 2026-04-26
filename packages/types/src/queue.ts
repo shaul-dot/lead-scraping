@@ -6,6 +6,7 @@ import type { ExaSearchInput } from './exa';
 export type QueueName =
   | 'scrape-facebook'
   | 'scrape-instagram'
+  | 'enrich-ig-candidate'
   | 'enrich'
   | 'score'
   | 'dedup'
@@ -32,6 +33,7 @@ export type QueueName =
 export type QueueJobData =
   | { queue: 'scrape-facebook'; data: ScrapeJobInput }
   | { queue: 'scrape-instagram'; data: ScrapeJobInput }
+  | { queue: 'enrich-ig-candidate'; data: { candidateId: string } }
   | { queue: 'enrich'; data: { leads: LeadInput[] } }
   | { queue: 'score'; data: { leads: EnrichedLead[] } }
   | { queue: 'dedup'; data: { leadIds: string[] } }

@@ -6,7 +6,10 @@
   "types": "./src/index.ts",
   "exports": {
     ".": "./src/index.ts",
-    "./qualification": "./src/qualification/index.ts"
+    "./qualification": "./src/qualification/index.ts",
+    "./qualification/qualifier-ig": "./src/qualification/qualifier-ig.ts",
+    "./brightdata": "./src/brightdata/index.ts",
+    "./utils/normalize-platform-handles": "./src/utils/normalize-platform-handles.ts"
   },
   "scripts": {
     "test": "vitest run",

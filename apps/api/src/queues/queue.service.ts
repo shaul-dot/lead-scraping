@@ -12,6 +12,7 @@ export class QueueService {
   constructor(
     @InjectQueue('scrape-facebook') private scrapeFb: Queue,
     @InjectQueue('scrape-instagram') private scrapeIg: Queue,
+    @InjectQueue('enrich-ig-candidate') private enrichIgCandidate: Queue,
     @InjectQueue('enrich') private enrich: Queue,
     @InjectQueue('score') private score: Queue,
     @InjectQueue('dedup') private dedup: Queue,
@@ -37,6 +38,7 @@ export class QueueService {
   ) {
     this.queues.set('scrape-facebook', scrapeFb);
     this.queues.set('scrape-instagram', scrapeIg);
+    this.queues.set('enrich-ig-candidate', enrichIgCandidate);
     this.queues.set('enrich', enrich);
     this.queues.set('score', score);
     this.queues.set('dedup', dedup);
