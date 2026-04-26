@@ -308,6 +308,14 @@ model Keyword {
   discoveredBy  String    @default("manual")
   discoveredAt  DateTime  @default(now())
   leads         Lead[]
+
+  category      String?
+  subCategory   String?
+  patternHint   String?
+  notes         String?
+
+  @@index([patternHint])
+  @@index([category])
 }
 
 model Campaign {
