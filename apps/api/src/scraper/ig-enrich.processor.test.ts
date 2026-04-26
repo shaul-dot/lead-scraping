@@ -245,7 +245,17 @@ describe('IgEnrichProcessor', () => {
     const p = new IgEnrichProcessor();
     await p.process(mkJob({ candidateId: 'c1' }));
 
-    expect(prisma.knownAdvertiser.create).toHaveBeenCalled();
+    expect(prisma.knownAdvertiser.create).toHaveBeenCalledWith({
+      data: expect.objectContaining({
+        instagramHandle: 'somehandle',
+        aiQualificationReason: 'ok',
+        aiQualificationCategory: 'coach',
+        aiQualificationConfidence: 'high',
+        aiQualificationStage: 2,
+        aiUrlFetchAttempted: true,
+        aiUrlFetchSucceeded: true,
+      }),
+    });
     expect(prisma.igCandidateProfile.update).toHaveBeenCalledWith({
       where: { id: 'c1' },
       data: { status: 'ENRICHED', enrichedAt: expect.any(Date) },

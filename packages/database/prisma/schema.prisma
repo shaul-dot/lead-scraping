@@ -278,6 +278,20 @@ model KnownAdvertiser {
   skoolHandle        String?
   discoveryChannel   DiscoveryChannel?
 
+  aiQualificationReason     String?
+  aiQualificationCategory   String?
+  aiQualificationConfidence String?
+  aiQualificationStage      Int?
+  aiUrlFetchAttempted       Boolean?
+  aiUrlFetchSucceeded       Boolean?
+  aiNiche                   String?
+  aiSubNiche                String?
+  aiOfferingType            String?
+  aiSpecificOffering        String?
+  aiUniqueAngle             String?
+  aiSocialProof             String?
+  aiToneSignals             String?
+
   lastTraversedAt    DateTime?
 
   @@index([websiteDomain])
@@ -291,6 +305,7 @@ model KnownAdvertiser {
   @@index([linkedinHandle])
   @@index([skoolHandle])
   @@index([discoveryChannel])
+  @@index([aiQualificationCategory])
 }
 
 model IgCandidateProfile {
