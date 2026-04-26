@@ -278,6 +278,8 @@ model KnownAdvertiser {
   skoolHandle        String?
   discoveryChannel   DiscoveryChannel?
 
+  lastTraversedAt    DateTime?
+
   @@index([websiteDomain])
   @@index([facebookPageId])
   @@index([fullName])
@@ -285,6 +287,7 @@ model KnownAdvertiser {
   @@index([vaReview])
   @@index([sourceKeyword])
   @@index([instagramHandle])
+  @@index([instagramHandle, lastTraversedAt])
   @@index([linkedinHandle])
   @@index([skoolHandle])
   @@index([discoveryChannel])
