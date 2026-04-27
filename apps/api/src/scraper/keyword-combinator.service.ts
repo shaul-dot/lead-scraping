@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { prisma } from '@hyperscale/database';
-import type { Keyword } from '@prisma/client';
+import type { Keyword } from '@hyperscale/database';
 
 export type SearchEntry = {
   query: string;
