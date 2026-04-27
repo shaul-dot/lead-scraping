@@ -8,19 +8,25 @@ import { normalizeInstagramHandle } from '@hyperscale/adapters/utils/normalize-p
 import { createLogger } from '../common/logger';
 import Anthropic from '@anthropic-ai/sdk';
 import { ExaLandingPageFetcher } from '@hyperscale/adapters/qualification';
-import { normalizeDomain } from '../../../../packages/adapters/src/utils/normalize-domain';
-import { isPlatformDomain } from '../../../../packages/adapters/src/utils/platform-domains';
+import { normalizeDomain } from '@hyperscale/adapters/utils/normalize-domain';
+import { isPlatformDomain } from '@hyperscale/adapters/utils/platform-domains';
 
 const logger = createLogger('ig-enrich-processor');
 
 const ALLOWED_COUNTRIES = new Set(['US', 'GB', 'AU', 'CA']);
+
+function safeBrightString(v: unknown): string | null {
+  if (typeof v !== 'string') return null;
+  const t = v.trim();
+  return t.length > 0 ? t : null;
+}
 
 export interface IgEnrichJobData {
   candidateId: string; // IgCandidateProfile.id
 }
 
 @Injectable()
-@Processor('enrich-ig-candidate')
+@Processor('enrich-ig-candidate', { concurrency: 5 })
 export class IgEnrichProcessor extends WorkerHost {
   private brightData: BrightDataClient | null = null;
   private qualifier: IgCoachQualifier | null = null;
@@ -129,7 +135,10 @@ export class IgEnrichProcessor extends WorkerHost {
     }
 
     // Step 4: Dedup check 2 — website domain match (if profile has external_url)
-    const landingUrl = profile.external_url?.trim() || null;
+    const landingUrl =
+      typeof profile.external_url === 'string' && profile.external_url.trim().length > 0
+        ? profile.external_url.trim()
+        : null;
     const domain = landingUrl ? normalizeDomain(landingUrl) : null;
     const websiteDomain = domain && !isPlatformDomain(domain) ? domain : null;
 
@@ -153,16 +162,17 @@ export class IgEnrichProcessor extends WorkerHost {
 
     // Step 5: Qualify with 2-stage qualifier
     const qualifierInput = {
-      username: profile.account,
-      fullName: profile.full_name,
-      category: profile.business_category_name ?? profile.category_name,
+      username: safeBrightString(profile.account) ?? normalizedHandle,
+      fullName: safeBrightString(profile.full_name),
+      category:
+        safeBrightString(profile.business_category_name) ?? safeBrightString(profile.category_name),
       followers: profile.followers,
       postsCount: profile.posts_count,
       isVerified: profile.is_verified,
       isBusinessAccount: profile.is_business_account,
       isPrivate: profile.is_private,
       externalUrl: landingUrl,
-      biography: profile.biography,
+      biography: safeBrightString(profile.biography),
     };
 
     let qualifierResult;
