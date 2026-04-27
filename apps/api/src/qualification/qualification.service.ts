@@ -5,8 +5,8 @@ import { getServiceApiKey } from '@hyperscale/sessions';
 import { createLogger } from '../common/logger';
 import { ExaClient } from '@hyperscale/exa';
 import Anthropic from '@anthropic-ai/sdk';
-import { normalizeDomain } from '../../../../packages/adapters/src/utils/normalize-domain';
-import { isPlatformDomain } from '../../../../packages/adapters/src/utils/platform-domains';
+import { normalizeDomain } from '@hyperscale/adapters/utils/normalize-domain';
+import { isPlatformDomain } from '@hyperscale/adapters/utils/platform-domains';
 import { StatsService } from '../stats/stats.service';
 
 const logger = createLogger('qualification');
@@ -348,7 +348,7 @@ export class QualificationService {
             title: r.title ?? '',
             snippet: (r.text ?? '').slice(0, 400),
             counters,
-            log,
+            log: log as any,
           });
           if (!ok) continue;
 
@@ -458,6 +458,7 @@ export class QualificationService {
                       landingPageUrl: landingUrl,
                       country: mostRecent.country ?? null,
                       addedBy: 'AI',
+                      discoveryChannel: 'APIFY_FB_ADS',
                       addedDate: new Date(),
                       leadSource,
                       enrichmentStatus: 'NEEDS_ENRICHMENT',
@@ -532,6 +533,7 @@ export class QualificationService {
                   landingPageUrl: landingUrl,
                   country: mostRecent.country ?? null,
                   addedBy: 'AI',
+                  discoveryChannel: 'APIFY_FB_ADS',
                   addedDate: new Date(),
                   leadSource,
                   enrichmentStatus: 'NEEDS_ENRICHMENT',
