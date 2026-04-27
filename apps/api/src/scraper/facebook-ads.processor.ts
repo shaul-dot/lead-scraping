@@ -4,8 +4,8 @@ import { prisma } from '@hyperscale/database';
 import { QueueService } from '../queues/queue.service';
 import { createLogger } from '../common/logger';
 import { getActiveFacebookAdapter } from '@hyperscale/adapters';
-import { normalizeDomain } from '../../../../packages/adapters/src/utils/normalize-domain';
-import { isPlatformDomain } from '../../../../packages/adapters/src/utils/platform-domains';
+import { normalizeDomain } from '@hyperscale/adapters/utils/normalize-domain';
+import { isPlatformDomain } from '@hyperscale/adapters/utils/platform-domains';
 import { StatsService } from '../stats/stats.service';
 
 const logger = createLogger('facebook-ads-processor');
@@ -216,7 +216,9 @@ export class FacebookAdsProcessor extends WorkerHost {
         where: { websiteDomain: { in: uniqueDomains } },
         select: { id: true, websiteDomain: true },
       });
-      for (const k of known) knownByDomain.set(k.websiteDomain, k.id);
+      for (const k of known) {
+        if (k.websiteDomain) knownByDomain.set(k.websiteDomain, k.id);
+      }
     }
 
     // PageId-based master list dedup for platform-domain advertisers (batch query).

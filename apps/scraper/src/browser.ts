@@ -1,4 +1,4 @@
-import { chromium, type Browser, type BrowserContext, type LaunchOptions } from 'playwright-extra';
+import { chromium } from 'playwright-extra';
 import StealthPlugin from 'puppeteer-extra-plugin-stealth';
 import pino from 'pino';
 
@@ -46,10 +46,10 @@ function getBrightDataProxy(): ProxyConfig | undefined {
 
 export async function createBrowser(
   proxy?: ProxyConfig,
-): Promise<Browser> {
+): Promise<any> {
   const resolvedProxy = proxy ?? getBrightDataProxy();
 
-  const launchOptions: LaunchOptions = {
+  const launchOptions: any = {
     headless: true,
     args: [
       '--disable-blink-features=AutomationControlled',
@@ -78,9 +78,9 @@ export async function createBrowser(
 }
 
 export async function createStealthContext(
-  browser: Browser,
+  browser: any,
   cookies?: string,
-): Promise<BrowserContext> {
+): Promise<any> {
   const userAgent = randomItem(USER_AGENTS);
   const viewport = randomItem(VIEWPORTS);
 
@@ -116,7 +116,7 @@ export async function createStealthContext(
   return context;
 }
 
-export async function closeBrowser(browser: Browser): Promise<void> {
+export async function closeBrowser(browser: any): Promise<void> {
   try {
     await browser.close();
     logger.info('Browser closed');

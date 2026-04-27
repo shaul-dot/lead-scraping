@@ -11,28 +11,27 @@ import {
   type DecryptedCredential,
 } from '@hyperscale/sessions';
 import { icpConfig } from '@hyperscale/config';
-import type { Browser, BrowserContext, Page } from 'playwright-core';
 
 const MAX_PROFILES_PER_SESSION = 50;
 const RATE_LIMIT_COOLDOWN_MS = 15 * 60 * 1000;
 
 interface ScrapeSession {
   credential: DecryptedCredential;
-  browser: Browser;
-  context: BrowserContext;
-  page: Page;
+  browser: any;
+  context: any;
+  page: any;
   profileCount: number;
 }
 
 export class InstagramTier3Adapter extends BaseAdapter {
-  private createBrowserFn: (() => Promise<Browser>) | undefined;
-  private createContextFn: ((browser: Browser, cookies?: string) => Promise<BrowserContext>) | undefined;
-  private closeBrowserFn: ((browser: Browser) => Promise<void>) | undefined;
+  private createBrowserFn: (() => Promise<any>) | undefined;
+  private createContextFn: ((browser: any, cookies?: string) => Promise<any>) | undefined;
+  private closeBrowserFn: ((browser: any) => Promise<void>) | undefined;
 
   constructor(opts?: {
-    createBrowser?: () => Promise<Browser>;
-    createStealthContext?: (browser: Browser, cookies?: string) => Promise<BrowserContext>;
-    closeBrowser?: (browser: Browser) => Promise<void>;
+    createBrowser?: () => Promise<any>;
+    createStealthContext?: (browser: any, cookies?: string) => Promise<any>;
+    closeBrowser?: (browser: any) => Promise<void>;
   }) {
     super('instagram');
     this.createBrowserFn = opts?.createBrowser;
@@ -40,19 +39,19 @@ export class InstagramTier3Adapter extends BaseAdapter {
     this.closeBrowserFn = opts?.closeBrowser;
   }
 
-  private async getCreateBrowser(): Promise<() => Promise<Browser>> {
+  private async getCreateBrowser(): Promise<() => Promise<any>> {
     if (this.createBrowserFn) return this.createBrowserFn;
     const { createBrowser } = await import('../../../../apps/scraper/src/browser.js');
     return createBrowser;
   }
 
-  private async getCreateContext(): Promise<(browser: Browser, cookies?: string) => Promise<BrowserContext>> {
+  private async getCreateContext(): Promise<(browser: any, cookies?: string) => Promise<any>> {
     if (this.createContextFn) return this.createContextFn;
     const { createStealthContext } = await import('../../../../apps/scraper/src/browser.js');
     return createStealthContext;
   }
 
-  private async getCloseBrowser(): Promise<(browser: Browser) => Promise<void>> {
+  private async getCloseBrowser(): Promise<(browser: any) => Promise<void>> {
     if (this.closeBrowserFn) return this.closeBrowserFn;
     const { closeBrowser } = await import('../../../../apps/scraper/src/browser.js');
     return closeBrowser;
@@ -229,7 +228,7 @@ export class InstagramTier3Adapter extends BaseAdapter {
     }
   }
 
-  private async verifyLogin(page: Page): Promise<boolean> {
+  private async verifyLogin(page: any): Promise<boolean> {
     try {
       await page.goto('https://www.instagram.com/', { waitUntil: 'domcontentloaded', timeout: 20_000 });
       await delay(3000, 5000);
@@ -330,7 +329,7 @@ export class InstagramTier3Adapter extends BaseAdapter {
     return profiles;
   }
 
-  private async scrapeProfile(page: Page, username: string): Promise<RawInstagramProfile | null> {
+  private async scrapeProfile(page: any, username: string): Promise<RawInstagramProfile | null> {
     try {
       const response = await page.goto(`https://www.instagram.com/${username}/`, {
         waitUntil: 'domcontentloaded',
@@ -386,7 +385,7 @@ export class InstagramTier3Adapter extends BaseAdapter {
     }
   }
 
-  private async extractText(page: Page, selectors: string[]): Promise<string | null> {
+  private async extractText(page: any, selectors: string[]): Promise<string | null> {
     for (const selector of selectors) {
       try {
         const el = await page.$(selector);
@@ -401,7 +400,7 @@ export class InstagramTier3Adapter extends BaseAdapter {
     return null;
   }
 
-  private async extractBioLink(page: Page): Promise<string | null> {
+  private async extractBioLink(page: any): Promise<string | null> {
     const selectors = [
       'a[rel="me nofollow noopener noreferrer"]',
       'header a[target="_blank"]',
@@ -436,7 +435,7 @@ export class InstagramTier3Adapter extends BaseAdapter {
     return null;
   }
 
-  private async extractFollowerCount(page: Page): Promise<number> {
+  private async extractFollowerCount(page: any): Promise<number> {
     try {
       const followerSelectors = [
         'a[href*="/followers/"] span',

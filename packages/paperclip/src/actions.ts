@@ -8,16 +8,16 @@ export async function logAction(
   category: PaperclipActionCategory,
   action: string,
   reasoning: string,
-  inputContext: Record<string, unknown>,
-  outputResult: Record<string, unknown>,
+  inputContext: unknown,
+  outputResult: unknown,
 ): Promise<string> {
   const record = await prisma.paperclipAction.create({
     data: {
       category,
       action,
       reasoning,
-      inputContext,
-      outputResult,
+      inputContext: inputContext as any,
+      outputResult: outputResult as any,
     },
   });
 

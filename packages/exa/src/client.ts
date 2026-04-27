@@ -53,10 +53,10 @@ export class ExaClient {
       numResults: options?.numResults ?? 10,
       startPublishedDate: options?.startPublishedDate,
       type: options?.type ?? 'auto',
-      category: options?.category,
+      category: options?.category as any,
       useAutoprompt: options?.useAutoprompt,
       text: options?.text ?? true,
-    });
+    } as any);
 
     return (response.results ?? []).map((r: any) => ({
       url: r.url,

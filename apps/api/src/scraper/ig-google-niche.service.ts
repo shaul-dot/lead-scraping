@@ -73,13 +73,6 @@ export class IgGoogleNicheService {
    * - Extracts IG handles from profile URLs
    * - Inserts IgCandidateProfile rows + enqueues enrich jobs
    */
-  async runOneCycle(keywordBatchSize: number): Promise<{
-    keywordsUsed: number;
-    queriesSucceeded: number;
-    totalResultsReturned: number;
-    candidatesEnqueued: number;
-    candidatesSkippedDuplicates: number;
-  }>;
   async runOneCycle(
     keywordBatchSize: number,
     country?: string,

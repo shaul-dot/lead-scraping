@@ -1,12 +1,11 @@
 import Anthropic from '@anthropic-ai/sdk';
 import { readFileSync } from 'node:fs';
-import { dirname, join } from 'node:path';
-import { fileURLToPath } from 'node:url';
+import { join } from 'node:path';
 
 const DEFAULT_MODEL = 'claude-haiku-4-5-20251001';
 
 const COACH_QUALIFIER_SYSTEM = readFileSync(
-  join(dirname(fileURLToPath(import.meta.url)), 'prompts', 'coach-qualifier.txt'),
+  join(__dirname, 'prompts', 'coach-qualifier.txt'),
   'utf8',
 );
 

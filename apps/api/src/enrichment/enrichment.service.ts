@@ -426,7 +426,7 @@ export class EnrichmentService {
 
       if (!response.ok) return null;
 
-      const data = await response.json();
+      const data = (await response.json()) as any;
       const items: Array<{ link: string }> = data.items ?? [];
       if (items.length === 0) return null;
 
@@ -468,7 +468,7 @@ export class EnrichmentService {
 
       if (!response.ok) return null;
 
-      const data = await response.json();
+      const data = (await response.json()) as any;
       const items: Array<{ link: string }> = data.items ?? [];
 
       const linkedinProfile = items.find((item) => item.link.includes('linkedin.com/in/'));
@@ -511,7 +511,7 @@ export class EnrichmentService {
         return null;
       }
 
-      const data = await response.json();
+      const data = (await response.json()) as any;
       const person = data.person;
       if (!person) return null;
 
@@ -557,7 +557,7 @@ export class EnrichmentService {
         return null;
       }
 
-      const data = await response.json();
+      const data = (await response.json()) as any;
       if (!data.email) return null;
 
       const result: EnrichmentProviderResult = {
@@ -601,7 +601,7 @@ export class EnrichmentService {
         return null;
       }
 
-      const data = await response.json();
+      const data = (await response.json()) as any;
       const emailEntries: Array<{ email: string; firstName?: string; lastName?: string; position?: string }> =
         data.emails ?? [];
 
@@ -661,7 +661,7 @@ export class EnrichmentService {
         return null;
       }
 
-      const data = await response.json();
+      const data = (await response.json()) as any;
       const emailData = data.emailAddresses?.[0];
       if (!emailData) return null;
 

@@ -36,23 +36,34 @@ async function handleReauth(job: Job<ReauthJobData>): Promise<void> {
     return;
   }
 
+  const credentialWithPassword: {
+    username?: string;
+    password: string;
+    cookies?: string;
+    totpSecret?: string;
+    phoneNumber?: string;
+  } = {
+    ...credential,
+    password: credential.password!,
+  };
+
   const browser = await createBrowser();
 
   try {
-    const context = await createStealthContext(browser, credential.cookies);
+    const context = await createStealthContext(browser, credentialWithPassword.cookies);
     const page = await context.newPage();
 
     let newCookies: string | undefined;
 
     switch (provider) {
       case 'linkedin':
-        newCookies = await reauthLinkedIn(page, credential);
+        newCookies = await reauthLinkedIn(page, credentialWithPassword);
         break;
       case 'instagram':
-        newCookies = await reauthInstagram(page, credential);
+        newCookies = await reauthInstagram(page, credentialWithPassword);
         break;
       default:
-        newCookies = await reauthGeneric(page, credential);
+        newCookies = await reauthGeneric(page, credentialWithPassword);
         break;
     }
 

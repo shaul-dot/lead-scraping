@@ -84,7 +84,7 @@ export class BrightDataClient {
       logger.error({ snapshotId, status: res.status }, 'Bright Data progress check failed');
       throw new BrightDataError(`Progress check failed: ${res.status}`, res.status, txt);
     }
-    return res.json();
+    return (await res.json()) as BrightDataSnapshotProgress;
   }
 
   private async downloadSnapshot<T>(snapshotId: string): Promise<T[]> {

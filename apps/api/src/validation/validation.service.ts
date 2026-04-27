@@ -195,7 +195,7 @@ export class ValidationService {
       throw new Error(`NB jobs/create failed: ${createRes.status} ${await createRes.text()}`);
     }
 
-    const createData = await createRes.json();
+    const createData = (await createRes.json()) as any;
     const jobId = createData.job_id;
     this.logger.info({ jobId, emailCount: emails.length }, 'NB batch job created');
 
@@ -214,7 +214,7 @@ export class ValidationService {
 
       if (!res.ok) throw new Error(`NB jobs/status failed: ${res.status}`);
 
-      const data = await res.json();
+      const data = (await res.json()) as any;
       const status = data.job_status;
 
       if (status === 'complete') return;
@@ -245,7 +245,7 @@ export class ValidationService {
 
       if (!res.ok) throw new Error(`NB jobs/results failed: ${res.status}`);
 
-      const data = await res.json();
+      const data = (await res.json()) as any;
       totalPages = data.total_pages ?? 1;
 
       for (const item of data.results ?? []) {
@@ -405,7 +405,7 @@ export class ValidationService {
       throw new Error(`BB bulk create failed: ${res.status} ${await res.text()}`);
     }
 
-    const data = await res.json();
+    const data = (await res.json()) as any;
     const taskId: string = data.id;
     this.logger.info({ taskId, emailCount: emails.length, credits: data.credits_remaining }, 'BB bulk task created');
 
@@ -425,7 +425,7 @@ export class ValidationService {
 
       if (!res.ok) throw new Error(`BB bulk/status failed: ${res.status}`);
 
-      const data = await res.json();
+      const data = (await res.json()) as any;
       const status = data.status?.toLowerCase();
 
       if (status === 'finished') return;
@@ -461,7 +461,7 @@ export class ValidationService {
 
       if (!res.ok) throw new Error(`BB bulk/dump failed: ${res.status}`);
 
-      const data = await res.json();
+      const data = (await res.json()) as any;
       cursor = data.cursor ?? null;
 
       for (const item of data.items ?? []) {

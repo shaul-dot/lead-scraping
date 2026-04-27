@@ -15,7 +15,7 @@ export class AlertService {
     actionTaken?: string,
   ): Promise<Alert> {
     const alert = await prisma.alert.create({
-      data: { severity, category, title, description, context, actionTaken },
+      data: { severity, category, title, description, context: context as any, actionTaken },
     });
     logger.warn({ severity, category, title }, 'Alert created');
     return alert;
