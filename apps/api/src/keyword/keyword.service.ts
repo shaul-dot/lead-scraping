@@ -9,6 +9,9 @@ const logger = createLogger('keyword');
 const SOURCE_ENUM_MAP: Record<Source, string> = {
   facebook_ads: 'FACEBOOK_ADS',
   instagram: 'INSTAGRAM',
+  FACEBOOK_ADS: 'FACEBOOK_ADS',
+  INSTAGRAM: 'INSTAGRAM',
+  MANUAL_IMPORT: 'MANUAL_IMPORT',
 };
 
 const THIRTY_DAYS_MS = 30 * 24 * 60 * 60 * 1000;
