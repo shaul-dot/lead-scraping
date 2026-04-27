@@ -10,10 +10,12 @@ function mkOrchestrator(opts?: {
   c2?: any;
   c3?: any;
   c4?: any;
+  c5?: any;
 }) {
   const igGoogleNicheService = opts?.c2 ?? { runOneCycle: vi.fn() };
   const igGoogleFunnelService = opts?.c3 ?? { runOneCycle: vi.fn() };
   const igGoogleAggregatorService = opts?.c4 ?? { runOneCycle: vi.fn() };
+  const igHashtagNicheService = opts?.c5 ?? { runOneCycle: vi.fn() };
 
   // Other deps are irrelevant for IG cycle unit tests
   const queue = {} as any;
@@ -41,9 +43,10 @@ function mkOrchestrator(opts?: {
     igGoogleNicheService,
     igGoogleFunnelService,
     igGoogleAggregatorService,
+    igHashtagNicheService,
   );
 
-  return { svc, igGoogleNicheService, igGoogleFunnelService, igGoogleAggregatorService };
+  return { svc, igGoogleNicheService, igGoogleFunnelService, igGoogleAggregatorService, igHashtagNicheService };
 }
 
 describe('OrchestratorService.runIgPipelineCycle', () => {
@@ -70,12 +73,23 @@ describe('OrchestratorService.runIgPipelineCycle', () => {
         handlesExtractedNone: 4,
       })),
     };
-    const { svc } = mkOrchestrator({ c2, c3, c4 });
+    const c5 = {
+      runOneCycle: vi.fn(async () => ({
+        hashtagsSelected: 0,
+        hashtagsScraped: 0,
+        uniqueUsernamesFound: 0,
+        candidatesPersisted: 0,
+        candidatesAlreadyExisted: 0,
+        enqueueErrors: 0,
+      })),
+    };
+    const { svc } = mkOrchestrator({ c2, c3, c4, c5 });
 
     const out = await svc.runIgPipelineCycle();
     expect(c2.runOneCycle).toHaveBeenCalledWith(3, 'US');
     expect(c3.runOneCycle).toHaveBeenCalledWith(3, 'US');
     expect(c4.runOneCycle).toHaveBeenCalledWith(2, 'US');
+    expect(c5.runOneCycle).toHaveBeenCalledWith();
 
     expect(out).toEqual({
       channel2: { keywordsUsed: 3, candidatesEnqueued: 10, candidatesSkippedDuplicates: 2 },
@@ -86,6 +100,14 @@ describe('OrchestratorService.runIgPipelineCycle', () => {
         candidatesSkippedDuplicates: 0,
         handlesExtractedNone: 4,
       },
+      channel5: {
+        hashtagsSelected: 0,
+        hashtagsScraped: 0,
+        uniqueUsernamesFound: 0,
+        candidatesPersisted: 0,
+        candidatesAlreadyExisted: 0,
+        enqueueErrors: 0,
+      },
     });
   });
 
@@ -94,12 +116,14 @@ describe('OrchestratorService.runIgPipelineCycle', () => {
     const c2 = { runOneCycle: vi.fn() };
     const c3 = { runOneCycle: vi.fn() };
     const c4 = { runOneCycle: vi.fn() };
-    const { svc } = mkOrchestrator({ c2, c3, c4 });
+    const c5 = { runOneCycle: vi.fn() };
+    const { svc } = mkOrchestrator({ c2, c3, c4, c5 });
 
     const out = await svc.runIgPipelineCycle();
     expect(c2.runOneCycle).not.toHaveBeenCalled();
     expect(c3.runOneCycle).not.toHaveBeenCalled();
     expect(c4.runOneCycle).not.toHaveBeenCalled();
+    expect(c5.runOneCycle).not.toHaveBeenCalled();
     expect(out.channel2.keywordsUsed).toBe(0);
     expect(out.channel3.combinationsUsed).toBe(0);
     expect(out.channel4.keywordsUsed).toBe(0);
@@ -122,12 +146,21 @@ describe('OrchestratorService.runIgPipelineCycle', () => {
         handlesExtractedNone: 8,
       })),
     };
-    const { svc } = mkOrchestrator({ c2, c3, c4 });
+    const c5 = { runOneCycle: vi.fn(async () => ({
+      hashtagsSelected: 0,
+      hashtagsScraped: 0,
+      uniqueUsernamesFound: 0,
+      candidatesPersisted: 0,
+      candidatesAlreadyExisted: 0,
+      enqueueErrors: 0,
+    })) };
+    const { svc } = mkOrchestrator({ c2, c3, c4, c5 });
 
     const out = await svc.runIgPipelineCycle();
     expect(c2.runOneCycle).toHaveBeenCalledWith(4, 'US');
     expect(c3.runOneCycle).toHaveBeenCalledWith(5, 'US');
     expect(c4.runOneCycle).toHaveBeenCalledWith(6, 'US');
+    expect(c5.runOneCycle).toHaveBeenCalledWith();
 
     expect(out.channel2).toEqual({ keywordsUsed: 0, candidatesEnqueued: 0, candidatesSkippedDuplicates: 0 });
     expect(out.channel3.combinationsUsed).toBe(5);

@@ -9,6 +9,7 @@ import { IgGraphTraversalService } from './ig-graph-traversal.service';
 import { IgGoogleNicheService } from './ig-google-niche.service';
 import { IgGoogleFunnelService } from './ig-google-funnel.service';
 import { IgGoogleAggregatorService } from './ig-google-aggregator.service';
+import { IgHashtagNicheService } from './ig-hashtag-niche.service';
 
 @Module({
   imports: [QueueModule, StatsModule],
@@ -21,12 +22,14 @@ import { IgGoogleAggregatorService } from './ig-google-aggregator.service';
     IgGoogleNicheService,
     IgGoogleFunnelService,
     IgGoogleAggregatorService,
+    IgHashtagNicheService,
   ],
   exports: [
     InstagramScraperService,
     IgGoogleNicheService,
     IgGoogleFunnelService,
     IgGoogleAggregatorService,
+    IgHashtagNicheService,
   ],
 })
 export class ScraperModule {}

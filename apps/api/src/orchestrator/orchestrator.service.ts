@@ -13,6 +13,7 @@ import { KeywordCombinatorService } from '../scraper/keyword-combinator.service'
 import { IgGoogleNicheService } from '../scraper/ig-google-niche.service';
 import { IgGoogleFunnelService } from '../scraper/ig-google-funnel.service';
 import { IgGoogleAggregatorService } from '../scraper/ig-google-aggregator.service';
+import { IgHashtagNicheService } from '../scraper/ig-hashtag-niche.service';
 import { selectRotationCountry } from './country-rotation';
 import {
   morningAssessment,
@@ -63,6 +64,8 @@ const DEFAULT_CONFIG: ScheduleConfig = {
 
 @Injectable()
 export class OrchestratorService {
+  private readonly igHashtagNicheService: IgHashtagNicheService;
+
   constructor(
     private readonly queue: QueueService,
     private readonly budget: BudgetService,
@@ -77,7 +80,11 @@ export class OrchestratorService {
     private readonly igGoogleNicheService: IgGoogleNicheService,
     private readonly igGoogleFunnelService: IgGoogleFunnelService,
     private readonly igGoogleAggregatorService: IgGoogleAggregatorService,
+    igHashtagNicheService: IgHashtagNicheService,
   ) {
+    // Avoid TS parameter-property edge cases in some runtimes (e.g. tsx execution).
+    this.igHashtagNicheService = igHashtagNicheService;
+
     logger.info(
       {
         scrapeCron: SCRAPE_CRON,
@@ -99,6 +106,14 @@ export class OrchestratorService {
       candidatesSkippedDuplicates: number;
       handlesExtractedNone: number;
     };
+    channel5: {
+      hashtagsSelected: number;
+      hashtagsScraped: number;
+      uniqueUsernamesFound: number;
+      candidatesPersisted: number;
+      candidatesAlreadyExisted: number;
+      enqueueErrors: number;
+    };
   }> {
     if (process.env.IG_PIPELINE_ENABLED === 'false') {
       logger.info('IG pipeline disabled via IG_PIPELINE_ENABLED=false, skipping cycle');
@@ -111,6 +126,14 @@ export class OrchestratorService {
           candidatesSkippedDuplicates: 0,
           handlesExtractedNone: 0,
         },
+        channel5: {
+          hashtagsSelected: 0,
+          hashtagsScraped: 0,
+          uniqueUsernamesFound: 0,
+          candidatesPersisted: 0,
+          candidatesAlreadyExisted: 0,
+          enqueueErrors: 0,
+        },
       };
     }
 
@@ -121,10 +144,11 @@ export class OrchestratorService {
     const c3Count = parsePositiveIntEnv('IG_CHANNEL_3_COMBINATIONS_PER_CYCLE', 3);
     const c4Count = parsePositiveIntEnv('IG_CHANNEL_4_KEYWORDS_PER_CYCLE', 2);
 
-    const [c2Result, c3Result, c4Result] = await Promise.allSettled([
+    const [c2Result, c3Result, c4Result, c5Result] = await Promise.allSettled([
       this.igGoogleNicheService.runOneCycle(c2Count, country),
       this.igGoogleFunnelService.runOneCycle(c3Count, country),
       this.igGoogleAggregatorService.runOneCycle(c4Count, country),
+      this.igHashtagNicheService.runOneCycle(),
     ]);
 
     if (c2Result.status === 'rejected') {
@@ -138,6 +162,10 @@ export class OrchestratorService {
     if (c4Result.status === 'rejected') {
       const message = c4Result.reason instanceof Error ? c4Result.reason.message : String(c4Result.reason);
       logger.error({ err: message }, 'IG Channel 4 failed');
+    }
+    if (c5Result.status === 'rejected') {
+      const message = c5Result.reason instanceof Error ? c5Result.reason.message : String(c5Result.reason);
+      logger.error({ err: message }, 'IG Channel 5 failed');
     }
 
     const c2 =
@@ -159,8 +187,22 @@ export class OrchestratorService {
             candidatesSkippedDuplicates: 0,
             handlesExtractedNone: 0,
           };
+    const c5 =
+      c5Result.status === 'fulfilled'
+        ? c5Result.value
+        : {
+            hashtagsSelected: 0,
+            hashtagsScraped: 0,
+            uniqueUsernamesFound: 0,
+            candidatesPersisted: 0,
+            candidatesAlreadyExisted: 0,
+            enqueueErrors: 0,
+          };
 
-    logger.info({ country, channel2: c2, channel3: c3, channel4: c4 }, 'IG pipeline cycle complete');
+    logger.info(
+      { country, channel2: c2, channel3: c3, channel4: c4, channel5: c5 },
+      'IG pipeline cycle complete',
+    );
 
     return {
       channel2: {
@@ -178,6 +220,14 @@ export class OrchestratorService {
         candidatesEnqueued: (c4 as any).candidatesEnqueued ?? 0,
         candidatesSkippedDuplicates: (c4 as any).candidatesSkippedDuplicates ?? 0,
         handlesExtractedNone: (c4 as any).handlesExtractedNone ?? 0,
+      },
+      channel5: {
+        hashtagsSelected: (c5 as any).hashtagsSelected ?? 0,
+        hashtagsScraped: (c5 as any).hashtagsScraped ?? 0,
+        uniqueUsernamesFound: (c5 as any).uniqueUsernamesFound ?? 0,
+        candidatesPersisted: (c5 as any).candidatesPersisted ?? 0,
+        candidatesAlreadyExisted: (c5 as any).candidatesAlreadyExisted ?? 0,
+        enqueueErrors: (c5 as any).enqueueErrors ?? 0,
       },
     };
   }

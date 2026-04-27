@@ -49,3 +49,5 @@ export type {
   BrightDataGoogleResult,
   BrightDataRelatedAccount,
 } from './brightdata/index';
+
+export { ApifyInstagramHashtagScraper, type ApifyHashtagScrapeResult } from './apify-instagram/hashtag-scraper';
