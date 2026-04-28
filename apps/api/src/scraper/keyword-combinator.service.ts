@@ -6,16 +6,34 @@ export type SearchEntry = {
   query: string;
   sourceKeyword: string;
   componentKeywordIds: string[];
-  patternType: 'identity' | 'niche_funnel' | 'transformation_funnel' | 'audience_funnel' | 'sweep';
+  patternType:
+    | 'identity'
+    | 'identity_funnel'
+    | 'niche'
+    | 'niche_funnel'
+    | 'transformation_funnel'
+    | 'audience_funnel'
+    | 'sweep';
 };
 
 type DbClient = typeof prisma;
 
+// Combinator weighting design:
+//   ~65% precision queries (primary keyword × lead-magnet pairing)
+//     - identity_funnel:          identity term × funnel term
+//     - niche_funnel:             niche term × funnel term
+//   ~35% coverage queries (broader, lower-precision patterns)
+//     - identity (alone):         single identity term
+//     - niche (alone):            single niche term
+//     - trans_or_audience_funnel: transformation/audience × funnel
+//     - sweep:                    broad keyword sweep
 const WEIGHTS = {
-  identity: 0.4,
-  niche_funnel: 0.4,
-  trans_or_audience_funnel: 0.1,
-  sweep: 0.1,
+  identity_funnel: 0.325,
+  niche_funnel: 0.325,
+  identity: 0.0875,
+  niche: 0.0875,
+  trans_or_audience_funnel: 0.0875,
+  sweep: 0.0875,
 } as const;
 
 function pickWeightedType(r: number): keyof typeof WEIGHTS {
@@ -107,6 +125,35 @@ export class KeywordCombinatorService {
           patternType: 'identity',
         });
         usedIds.push(k.id);
+        continue;
+      }
+
+      if (slot === 'niche') {
+        if (nichePool.length === 0) continue;
+        const k = randomPick(nichePool);
+        const query = k.primary;
+        entries.push({
+          query,
+          sourceKeyword: query,
+          componentKeywordIds: [k.id],
+          patternType: 'niche',
+        });
+        usedIds.push(k.id);
+        continue;
+      }
+
+      if (slot === 'identity_funnel') {
+        if (identityPool.length === 0 || funnelPool.length === 0) continue;
+        const identity = randomPick(identityPool);
+        const funnel = randomPick(funnelPool);
+        const query = `${identity.primary} ${funnel.primary}`;
+        entries.push({
+          query,
+          sourceKeyword: query,
+          componentKeywordIds: [identity.id, funnel.id],
+          patternType: 'identity_funnel',
+        });
+        usedIds.push(identity.id, funnel.id);
         continue;
       }
 
