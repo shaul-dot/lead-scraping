@@ -85,12 +85,30 @@ enum AdvertiserQualStatus {
 }
 
 enum EnrichmentStatus {
-  NEEDS_ENRICHMENT
+  PENDING
   IN_PROGRESS
-  ENRICHED
-  CONTACTED
-  REPLIED
-  DEAD
+  COMPLETED
+  FAILED
+  NO_EMAIL_FOUND
+}
+
+enum EmailSource {
+  BIO_TEXT
+  SITE_SCRAPE
+  LINKTREE_RESOLVE
+  GOOGLE_SERP
+  SNOV
+  GUESS
+  APIFY_IG_SCRAPER
+  APOLLO
+  BUSINESS_EMAIL
+}
+
+enum EmailType {
+  GENERIC
+  PERSONAL
+  ROLE
+  UNKNOWN
 }
 
 enum DiscoveryChannel {
@@ -267,7 +285,11 @@ model KnownAdvertiser {
   addedBy            String?
   addedDate          DateTime?
   leadSource         String?
-  enrichmentStatus   EnrichmentStatus @default(NEEDS_ENRICHMENT)
+  enrichmentStatus      EnrichmentStatus @default(PENDING)
+  enrichmentStartedAt   DateTime?
+  enrichmentCompletedAt DateTime?
+  enrichmentLastError     String?
+  enrichmentAttempts    Int              @default(0)
   enrichmentNotes    String?
   importedAt         DateTime @default(now())
   vaReview           VaReviewStatus @default(UNREVIEWED)
@@ -299,6 +321,8 @@ model KnownAdvertiser {
 
   lastTraversedAt    DateTime?
 
+  leadEmails         LeadEmail[]
+
   @@index([websiteDomain])
   @@index([facebookPageId])
   @@index([fullName])
@@ -311,6 +335,23 @@ model KnownAdvertiser {
   @@index([skoolHandle])
   @@index([discoveryChannel])
   @@index([aiQualificationCategory])
+}
+
+model LeadEmail {
+  id            String          @id @default(cuid())
+  leadId        String
+  lead          KnownAdvertiser @relation(fields: [leadId], references: [id], onDelete: Cascade)
+
+  address       String
+  source        EmailSource
+  sourceDetail  String?
+  emailType     EmailType       @default(UNKNOWN)
+
+  createdAt     DateTime        @default(now())
+
+  @@unique([leadId, address])
+  @@index([leadId])
+  @@index([address])
 }
 
 model IgCandidateProfile {
