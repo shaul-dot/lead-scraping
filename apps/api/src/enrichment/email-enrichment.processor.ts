@@ -1,12 +1,16 @@
 import { Processor, WorkerHost, OnWorkerEvent } from '@nestjs/bullmq';
 import { Inject, Injectable } from '@nestjs/common';
 import type { Job } from 'bullmq';
+import Anthropic from '@anthropic-ai/sdk';
 import { prisma } from '@hyperscale/database';
+import { BrightDataClient } from '@hyperscale/adapters';
 import { SnovClient } from '@hyperscale/snov';
 import { createLogger } from '../common/logger';
 import { mineBioText } from './stages/stage-0-bio-mining';
 import { scrapeSite } from './stages/stage-1-site-scrape';
 import { resolveLinktree, type Stage2Result } from './stages/stage-2-linktree-resolver';
+import { discoverDomain, type Stage3aResult } from './stages/stage-3a-domain-discovery';
+import { discoverEmails } from './stages/stage-3b-email-discovery';
 import { searchSnovDomain } from './stages/stage-4-snov';
 import { classifyEmailType, generatePatternGuesses } from './stages/stage-5-pattern-guesses';
 
@@ -31,6 +35,8 @@ function deriveLastName(fullName: string | null | undefined, firstName: string |
 @Processor(EMAIL_ENRICHMENT_QUEUE, { concurrency: 3 })
 export class EmailEnrichmentProcessor extends WorkerHost {
   constructor(
+    @Inject('BRIGHT_DATA_CLIENT') private readonly brightData: BrightDataClient | null,
+    @Inject('ANTHROPIC_CLIENT') private readonly anthropic: Anthropic | null,
     @Inject('SNOV_CLIENT') private readonly snovClient: SnovClient | null,
   ) {
     super();
@@ -58,6 +64,7 @@ export class EmailEnrichmentProcessor extends WorkerHost {
         fullName: true,
         websiteDomain: true,
         landingPageUrl: true,
+        aiNiche: true,
       },
     });
 
@@ -126,7 +133,54 @@ export class EmailEnrichmentProcessor extends WorkerHost {
       }
     }
 
-    const effectiveDomain = lead.websiteDomain ?? stage0.promotedDomain ?? stage2?.resolvedDomain ?? null;
+    let stage3a: Stage3aResult | null = null;
+
+    // Stage 3a: SERP-based domain discovery.
+    // Runs if: no domain found from prior stages, lead has fullName + aiNiche,
+    // and both BrightDataClient + Anthropic clients are configured.
+    if (
+      !lead.websiteDomain &&
+      !stage0.promotedDomain &&
+      !stage2?.resolvedDomain &&
+      lead.fullName &&
+      lead.aiNiche &&
+      this.brightData &&
+      this.anthropic
+    ) {
+      stage3a = await discoverDomain(this.brightData, this.anthropic, lead.fullName, lead.aiNiche);
+
+      logger.info(
+        {
+          knownAdvertiserId,
+          personName: lead.fullName,
+          niche: lead.aiNiche,
+          serpSucceeded: stage3a.serpSucceeded,
+          candidatesValidated: stage3a.candidatesValidated,
+          validationSucceeded: stage3a.validationSucceeded,
+          resolvedDomain: stage3a.resolvedDomain,
+          reasoning: stage3a.reasoning,
+        },
+        'Stage 3a domain discovery complete',
+      );
+
+      if (stage3a.resolvedDomain && stage3a.resolvedUrl) {
+        await prisma.knownAdvertiser.update({
+          where: { id: knownAdvertiserId },
+          data: {
+            websiteDomain: stage3a.resolvedDomain,
+            websiteUrlOriginal: stage3a.resolvedUrl,
+            landingPageUrl: stage3a.resolvedUrl,
+          },
+        });
+      }
+
+      if (stage3a.error) {
+        logger.warn({ knownAdvertiserId, err: stage3a.error }, 'Stage 3a SERP/validation error');
+      }
+    }
+
+    const effectiveDomain =
+      lead.websiteDomain ?? stage0.promotedDomain ?? stage2?.resolvedDomain ?? stage3a?.resolvedDomain ?? null;
 
     if (effectiveDomain) {
       const stage1 = await scrapeSite(effectiveDomain);
@@ -202,6 +256,46 @@ export class EmailEnrichmentProcessor extends WorkerHost {
       }
     }
 
+    // Stage 3b: SERP-based email discovery.
+    // Runs if: we have an effectiveDomain, no emails from any prior stage,
+    // and BrightDataClient is configured.
+    if (effectiveDomain && this.brightData) {
+      const existingEmailCountFor3b = await prisma.leadEmail.count({
+        where: { leadId: knownAdvertiserId },
+      });
+
+      if (existingEmailCountFor3b === 0) {
+        const stage3b = await discoverEmails(this.brightData, effectiveDomain);
+
+        logger.info(
+          {
+            knownAdvertiserId,
+            domain: effectiveDomain,
+            serpSucceeded: stage3b.serpSucceeded,
+            emailsFound: stage3b.emails.length,
+          },
+          'Stage 3b email discovery complete',
+        );
+
+        if (stage3b.emails.length > 0) {
+          await prisma.leadEmail.createMany({
+            data: stage3b.emails.map((address) => ({
+              leadId: knownAdvertiserId,
+              address,
+              source: 'GOOGLE_SERP',
+              sourceDetail: 'snippet',
+              emailType: classifyEmailType(address),
+            })),
+            skipDuplicates: true,
+          });
+        }
+
+        if (stage3b.error) {
+          logger.warn({ knownAdvertiserId, err: stage3b.error }, 'Stage 3b SERP error');
+        }
+      }
+    }
+
     if (effectiveDomain) {
       const lastName = deriveLastName(lead.fullName, lead.firstName);
       const guesses = generatePatternGuesses(lead.firstName, lastName, effectiveDomain);
@@ -219,7 +313,6 @@ export class EmailEnrichmentProcessor extends WorkerHost {
       }
     }
 
-    // TODO: Stage 3a/3b (Google SERP) — Brief 6
     // TODO: Stage 6 (Apify IG scraper) — Brief 8
 
     await prisma.knownAdvertiser.update({

@@ -19,6 +19,18 @@ export interface BrightDataClientOptions {
 
 const BASE_URL = 'https://api.brightdata.com/datasets/v3';
 
+/** Parsed organic row from Google SERP snapshot (`organic[]`). */
+export type GoogleSerpOrganicResult = {
+  rank: number;
+  link: string;
+  title: string;
+  description: string;
+};
+
+export type GoogleSerpResult =
+  | { success: true; organic: GoogleSerpOrganicResult[]; snapshotId: string; durationMs: number }
+  | { success: false; reason: string; snapshotId: string | null; durationMs: number };
+
 export class BrightDataClient {
   private apiToken: string;
   private igProfileDatasetId: string;
@@ -191,6 +203,94 @@ export class BrightDataClient {
   ): Promise<BrightDataGoogleResult[]> {
     const snapshotId = await this.triggerGoogleSearch(queries, options);
     return this.waitForGoogleResults(snapshotId);
+  }
+
+  /**
+   * Run a Google search via Bright Data SERP and return parsed organic results.
+   * Trigger + poll + fetch snapshot in a single call. Blocks until complete or
+   * timeout (default 180s).
+   */
+  async runGoogleSerp(
+    query: string,
+    options?: { timeoutMs?: number; country?: string },
+  ): Promise<GoogleSerpResult> {
+    const started = Date.now();
+    const timeoutMs = options?.timeoutMs ?? 180_000;
+    let snapshotId: string | null = null;
+
+    try {
+      snapshotId = await this.triggerGoogleSearch([query], { country: options?.country });
+    } catch (err) {
+      const reason =
+        err instanceof BrightDataError
+          ? `${err.message}${err.statusCode != null ? ` (${err.statusCode})` : ''}`
+          : err instanceof Error
+            ? err.message
+            : String(err);
+      return {
+        success: false,
+        reason,
+        snapshotId: null,
+        durationMs: Date.now() - started,
+      };
+    }
+
+    const deadline = started + timeoutMs;
+    const pollMs = 2000;
+
+    try {
+      while (Date.now() < deadline) {
+        await new Promise((r) => setTimeout(r, pollMs));
+        const progress = await this.getSnapshotProgress(snapshotId);
+
+        if (progress.status === 'failed') {
+          return {
+            success: false,
+            reason: `Bright Data snapshot failed`,
+            snapshotId,
+            durationMs: Date.now() - started,
+          };
+        }
+
+        if (progress.status === 'ready') {
+          await new Promise((r) => setTimeout(r, 2000));
+          const records = await this.downloadSnapshot<BrightDataSerpRecord>(snapshotId);
+          const organicRaw = records[0]?.organic ?? [];
+          const organic: GoogleSerpOrganicResult[] = organicRaw.map((o) => ({
+            rank: o.rank,
+            link: o.link,
+            title: o.title,
+            description: o.description ?? '',
+          }));
+          return {
+            success: true,
+            organic,
+            snapshotId,
+            durationMs: Date.now() - started,
+          };
+        }
+      }
+
+      return {
+        success: false,
+        reason: `Bright Data SERP timed out after ${timeoutMs}ms`,
+        snapshotId,
+        durationMs: Date.now() - started,
+      };
+    } catch (err) {
+      const reason =
+        err instanceof BrightDataError
+          ? `${err.message}${err.statusCode != null ? ` (${err.statusCode})` : ''}`
+          : err instanceof Error
+            ? err.message
+            : String(err);
+      return {
+        success: false,
+        reason,
+        snapshotId,
+        durationMs: Date.now() - started,
+      };
+    }
   }
 }
 

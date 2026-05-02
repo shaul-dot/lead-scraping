@@ -48,6 +48,15 @@ export type {
   BrightDataInstagramProfile,
   BrightDataGoogleResult,
   BrightDataRelatedAccount,
+  GoogleSerpOrganicResult,
+  GoogleSerpResult,
 } from './brightdata/index';
+
+export {
+  validateDomainCandidate,
+  type DomainCandidate,
+  type DomainValidationInput,
+  type DomainValidationResult,
+} from './claude/domain-validator';
 
 export { ApifyInstagramHashtagScraper, type ApifyHashtagScrapeResult } from './apify-instagram/hashtag-scraper';
