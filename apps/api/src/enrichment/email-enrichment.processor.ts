@@ -1,11 +1,13 @@
 import { Processor, WorkerHost, OnWorkerEvent } from '@nestjs/bullmq';
-import { Injectable } from '@nestjs/common';
+import { Inject, Injectable } from '@nestjs/common';
 import type { Job } from 'bullmq';
 import { prisma } from '@hyperscale/database';
+import { SnovClient } from '@hyperscale/snov';
 import { createLogger } from '../common/logger';
 import { mineBioText } from './stages/stage-0-bio-mining';
 import { scrapeSite } from './stages/stage-1-site-scrape';
 import { resolveLinktree, type Stage2Result } from './stages/stage-2-linktree-resolver';
+import { searchSnovDomain } from './stages/stage-4-snov';
 import { classifyEmailType, generatePatternGuesses } from './stages/stage-5-pattern-guesses';
 
 const logger = createLogger('email-enrichment-processor');
@@ -28,7 +30,9 @@ function deriveLastName(fullName: string | null | undefined, firstName: string |
 @Injectable()
 @Processor(EMAIL_ENRICHMENT_QUEUE, { concurrency: 3 })
 export class EmailEnrichmentProcessor extends WorkerHost {
-  constructor() {
+  constructor(
+    @Inject('SNOV_CLIENT') private readonly snovClient: SnovClient | null,
+  ) {
     super();
   }
 
@@ -155,6 +159,49 @@ export class EmailEnrichmentProcessor extends WorkerHost {
       }
     }
 
+    // Stage 4: Snov domain search.
+    // Runs if we have an effectiveDomain, no emails from prior stages, and Snov is configured.
+    if (effectiveDomain && this.snovClient !== null) {
+      const existingEmailCount = await prisma.leadEmail.count({
+        where: { leadId: knownAdvertiserId },
+      });
+
+      if (existingEmailCount === 0) {
+        const stage4 = await searchSnovDomain(this.snovClient, effectiveDomain);
+
+        logger.info(
+          {
+            knownAdvertiserId,
+            domain: effectiveDomain,
+            fetchSucceeded: stage4.fetchSucceeded,
+            emailsFound: stage4.emails.length,
+            creditsConsumed: stage4.creditsConsumed,
+          },
+          'Stage 4 Snov domain search complete',
+        );
+
+        if (stage4.emails.length > 0) {
+          await prisma.leadEmail.createMany({
+            data: stage4.emails.map((hit) => ({
+              leadId: knownAdvertiserId,
+              address: hit.address,
+              source: 'SNOV',
+              sourceDetail: hit.position ?? hit.snovType ?? null,
+              emailType: classifyEmailType(hit.address),
+            })),
+            skipDuplicates: true,
+          });
+        }
+
+        if (stage4.error) {
+          logger.warn(
+            { knownAdvertiserId, domain: effectiveDomain, err: stage4.error },
+            'Stage 4 Snov call returned error',
+          );
+        }
+      }
+    }
+
     if (effectiveDomain) {
       const lastName = deriveLastName(lead.fullName, lead.firstName);
       const guesses = generatePatternGuesses(lead.firstName, lastName, effectiveDomain);
@@ -173,7 +220,6 @@ export class EmailEnrichmentProcessor extends WorkerHost {
     }
 
     // TODO: Stage 3a/3b (Google SERP) — Brief 6
-    // TODO: Stage 4 (Snov) — Brief 7
     // TODO: Stage 6 (Apify IG scraper) — Brief 8
 
     await prisma.knownAdvertiser.update({
