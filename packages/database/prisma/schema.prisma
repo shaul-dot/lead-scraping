@@ -293,6 +293,10 @@ model KnownAdvertiser {
   aiToneSignals             String?
   aiInferredCountry         String?
 
+  biography            String?
+  businessEmail        String?
+  rawProfileMetadata   Json?
+
   lastTraversedAt    DateTime?
 
   @@index([websiteDomain])

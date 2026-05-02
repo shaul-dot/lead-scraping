@@ -7,7 +7,7 @@ export interface BrightDataInstagramProfile {
   is_professional_account: boolean;
   is_verified: boolean;
   avg_engagement: number;
-  external_url: string | null;
+  external_url: string[] | null;
   biography: string | null;
   business_category_name: string | null;
   category_name: string | null;
@@ -25,10 +25,10 @@ export interface BrightDataInstagramProfile {
   business_address: any | null;
   related_accounts: BrightDataRelatedAccount[] | null;
   email_address: string | null;
-  external_url_title: string | null;
+  external_url_title: { url: string; title: string } | null;
   pronouns: string | null;
   timestamp: string;
-  input_url: string;
+  input: { url: string };
   error?: string;
   error_code?: string;
   warning?: string;

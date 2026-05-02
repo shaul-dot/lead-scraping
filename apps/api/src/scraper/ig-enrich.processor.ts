@@ -1,7 +1,7 @@
 import { Processor, WorkerHost, OnWorkerEvent } from '@nestjs/bullmq';
 import { Injectable } from '@nestjs/common';
 import type { Job } from 'bullmq';
-import { prisma } from '@hyperscale/database';
+import { prisma, Prisma } from '@hyperscale/database';
 import { BrightDataClient, type BrightDataInstagramProfile } from '@hyperscale/adapters/brightdata';
 import { IgCoachQualifier } from '@hyperscale/adapters/qualification/qualifier-ig';
 import { normalizeInstagramHandle } from '@hyperscale/adapters/utils/normalize-platform-handles';
@@ -135,10 +135,16 @@ export class IgEnrichProcessor extends WorkerHost {
     }
 
     // Step 4: Dedup check 2 — website domain match (if profile has external_url)
-    const landingUrl =
-      typeof profile.external_url === 'string' && profile.external_url.trim().length > 0
-        ? profile.external_url.trim()
-        : null;
+    // Bright Data returns external_url as string[] | null. Pick the first
+    // non-empty string entry as the landing URL.
+    const externalUrls = Array.isArray(profile.external_url)
+      ? profile.external_url
+      : [];
+    const firstValidExternalUrl =
+      externalUrls
+        .find((u): u is string => typeof u === 'string' && u.trim().length > 0)
+        ?.trim() ?? null;
+    let landingUrl: string | null = firstValidExternalUrl;
     const domain = landingUrl ? normalizeDomain(landingUrl) : null;
     const websiteDomain = domain && !isPlatformDomain(domain) ? domain : null;
 
@@ -215,6 +221,14 @@ export class IgEnrichProcessor extends WorkerHost {
       const businessName = qualifierResult.metadata?.businessName ?? profile.profile_name ?? null;
       const firstName = personName?.trim().split(/\s+/)[0] ?? null;
 
+      // Strip the `posts` array before persisting — it's by far the largest field
+      // and we don't currently use it. The rest of the response is kept verbatim
+      // for future enrichment / personalization use.
+      const { posts: _posts, ...rawProfileForStorage } = profile as unknown as Record<
+        string,
+        unknown
+      >;
+
       try {
         await prisma.knownAdvertiser.create({
           data: {
@@ -248,6 +262,9 @@ export class IgEnrichProcessor extends WorkerHost {
             aiSocialProof: qualifierResult.metadata?.socialProof ?? null,
             aiToneSignals: qualifierResult.metadata?.toneSignals ?? null,
             aiInferredCountry: qualifierResult.inferredCountry ?? null,
+            biography: profile.biography ?? null,
+            businessEmail: profile.email_address ?? null,
+            rawProfileMetadata: rawProfileForStorage as Prisma.InputJsonValue,
           },
         });
 
