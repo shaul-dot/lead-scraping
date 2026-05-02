@@ -4,6 +4,7 @@ import type { Job } from 'bullmq';
 import { prisma } from '@hyperscale/database';
 import { createLogger } from '../common/logger';
 import { mineBioText } from './stages/stage-0-bio-mining';
+import { scrapeSite } from './stages/stage-1-site-scrape';
 import { classifyEmailType, generatePatternGuesses } from './stages/stage-5-pattern-guesses';
 
 const logger = createLogger('email-enrichment-processor');
@@ -84,10 +85,42 @@ export class EmailEnrichmentProcessor extends WorkerHost {
       });
     }
 
-    const domainForPatterns = lead.websiteDomain ?? stage0.promotedDomain;
-    if (domainForPatterns) {
+    const effectiveDomain = lead.websiteDomain ?? stage0.promotedDomain;
+
+    if (effectiveDomain) {
+      const stage1 = await scrapeSite(effectiveDomain);
+      logger.info(
+        {
+          knownAdvertiserId,
+          domain: effectiveDomain,
+          stage1PagesAttempted: stage1.pagesAttempted,
+          stage1PagesSucceeded: stage1.pagesSucceeded,
+          stage1EmailCount: stage1.emails.length,
+        },
+        'Stage 1 site scrape complete',
+      );
+      if (stage1.emails.length > 0) {
+        await prisma.leadEmail.createMany({
+          data: stage1.emails.map((hit) => ({
+            leadId: knownAdvertiserId,
+            address: hit.address,
+            source: 'SITE_SCRAPE',
+            sourceDetail: hit.page,
+            emailType: classifyEmailType(hit.address),
+          })),
+          skipDuplicates: true,
+        });
+      } else if (stage1.errors.length > 0) {
+        logger.warn(
+          { knownAdvertiserId, domain: effectiveDomain, errors: stage1.errors },
+          'Stage 1 found no emails; page fetch errors occurred',
+        );
+      }
+    }
+
+    if (effectiveDomain) {
       const lastName = deriveLastName(lead.fullName, lead.firstName);
-      const guesses = generatePatternGuesses(lead.firstName, lastName, domainForPatterns);
+      const guesses = generatePatternGuesses(lead.firstName, lastName, effectiveDomain);
       if (guesses.length > 0) {
         await prisma.leadEmail.createMany({
           data: guesses.map((g) => ({
@@ -102,7 +135,6 @@ export class EmailEnrichmentProcessor extends WorkerHost {
       }
     }
 
-    // TODO: Stage 1 (Exa site scrape) — Brief 4
     // TODO: Stage 2 (linktree resolver) — Brief 5
     // TODO: Stage 3a/3b (Google SERP) — Brief 6
     // TODO: Stage 4 (Snov) — Brief 7
