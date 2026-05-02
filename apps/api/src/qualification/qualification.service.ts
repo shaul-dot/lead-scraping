@@ -8,6 +8,8 @@ import Anthropic from '@anthropic-ai/sdk';
 import { normalizeDomain } from '@hyperscale/adapters/utils/normalize-domain';
 import { isPlatformDomain } from '@hyperscale/adapters/utils/platform-domains';
 import { StatsService } from '../stats/stats.service';
+import { QueueService } from '../queues/queue.service';
+import { EMAIL_ENRICHMENT_QUEUE } from '../enrichment/email-enrichment.processor';
 
 const logger = createLogger('qualification');
 
@@ -129,7 +131,10 @@ export class QualificationService {
   private exaClient: ExaClient | null = null;
   private anthropic: Anthropic | null = null;
 
-  constructor(private readonly statsService: StatsService) {}
+  constructor(
+    private readonly statsService: StatsService,
+    private readonly queueService: QueueService,
+  ) {}
 
   private async ensureClients(): Promise<void> {
     if (this.exaFetcher && this.coachQualifier && this.exaClient && this.anthropic) return;
@@ -461,7 +466,7 @@ export class QualificationService {
                       discoveryChannel: 'APIFY_FB_ADS',
                       addedDate: new Date(),
                       leadSource,
-                      enrichmentStatus: 'NEEDS_ENRICHMENT',
+                      enrichmentStatus: 'PENDING',
                       sourceKeyword: advertiser.sourceKeyword,
                       aiQualificationReason: out.reason,
                       aiQualificationCategory: out.category,
@@ -485,6 +490,17 @@ export class QualificationService {
                     );
                   } catch (err) {
                     log.warn({ err }, 'Failed to track aiLeadsAddedToMaster (non-fatal)');
+                  }
+
+                  try {
+                    await this.queueService.addJob(EMAIL_ENRICHMENT_QUEUE, {
+                      knownAdvertiserId: created.id,
+                    });
+                  } catch (err) {
+                    log.warn(
+                      { err, knownAdvertiserId: created.id },
+                      'Failed to enqueue email enrichment job (non-fatal)',
+                    );
                   }
 
                   log.info(
@@ -536,7 +552,7 @@ export class QualificationService {
                   discoveryChannel: 'APIFY_FB_ADS',
                   addedDate: new Date(),
                   leadSource,
-                  enrichmentStatus: 'NEEDS_ENRICHMENT',
+                  enrichmentStatus: 'PENDING',
                   sourceKeyword: advertiser.sourceKeyword,
                   aiQualificationReason: out.reason,
                   aiQualificationCategory: out.category,
@@ -556,6 +572,14 @@ export class QualificationService {
                 await this.statsService.incrementStat(new Date(), 'aiLeadsAddedToMaster', 1);
               } catch (err) {
                 log.warn({ err }, 'Failed to track aiLeadsAddedToMaster (non-fatal)');
+              }
+
+              try {
+                await this.queueService.addJob(EMAIL_ENRICHMENT_QUEUE, {
+                  knownAdvertiserId: created.id,
+                });
+              } catch (err) {
+                log.warn({ err, knownAdvertiserId: created.id }, 'Failed to enqueue email enrichment job (non-fatal)');
               }
 
               log.info(

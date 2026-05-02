@@ -29,6 +29,7 @@ const ALL_QUEUES: QueueName[] = [
   'keyword-score',
   'stats-rollup',
   'qualify',
+  'email-enrichment',
 ];
 
 const queueRegistrations = ALL_QUEUES.map((name) =>

@@ -28,7 +28,8 @@ export type QueueName =
   | 'exa-search'
   | 'keyword-score'
   | 'stats-rollup'
-  | 'qualify';
+  | 'qualify'
+  | 'email-enrichment';
 
 export type QueueJobData =
   | { queue: 'scrape-facebook'; data: ScrapeJobInput }
@@ -55,4 +56,5 @@ export type QueueJobData =
   | { queue: 'exa-search'; data: ExaSearchInput }
   | { queue: 'keyword-score'; data: { keyword: string; source: string } }
   | { queue: 'stats-rollup'; data: { date: string } }
-  | { queue: 'qualify'; data: { advertiserId: string } };
+  | { queue: 'qualify'; data: { advertiserId: string } }
+  | { queue: 'email-enrichment'; data: { knownAdvertiserId: string } };

@@ -40,6 +40,10 @@ function mkJob(data: any) {
   return { id: 'job1', data } as any;
 }
 
+function mkQueueService() {
+  return { addJob: vi.fn().mockResolvedValue('jq1') } as any;
+}
+
 function mockBrightDataOnce(scrapeInstagramProfiles: any) {
   (BrightDataClient as any).mockImplementationOnce(function (this: any) {
     this.scrapeInstagramProfiles = scrapeInstagramProfiles;
@@ -60,11 +64,12 @@ describe('IgEnrichProcessor', () => {
     process.env.BRIGHT_DATA_API_TOKEN = 'x';
     process.env.ANTHROPIC_API_KEY = 'y';
     process.env.EXA_API_KEY = 'z';
+    (prisma.knownAdvertiser.create as any).mockResolvedValue({ id: 'known-new-1' });
   });
 
   it('Candidate not found -> returns early', async () => {
     (prisma.igCandidateProfile.findUnique as any).mockResolvedValue(null);
-    const p = new IgEnrichProcessor();
+    const p = new IgEnrichProcessor(mkQueueService());
     await p.process(mkJob({ candidateId: 'c1' }));
     expect(prisma.igCandidateProfile.update).not.toHaveBeenCalled();
   });
@@ -75,7 +80,7 @@ describe('IgEnrichProcessor', () => {
       instagramHandle: 'somehandle',
       status: 'ENRICHED',
     });
-    const p = new IgEnrichProcessor();
+    const p = new IgEnrichProcessor(mkQueueService());
     await p.process(mkJob({ candidateId: 'c1' }));
     expect(prisma.igCandidateProfile.update).not.toHaveBeenCalled();
   });
@@ -94,7 +99,7 @@ describe('IgEnrichProcessor', () => {
       }),
     );
     mockQualifierOnce(vi.fn());
-    const p = new IgEnrichProcessor();
+    const p = new IgEnrichProcessor(mkQueueService());
 
     await p.process(mkJob({ candidateId: 'c1' }));
     expect(prisma.igCandidateProfile.update).toHaveBeenCalledWith({
@@ -113,7 +118,7 @@ describe('IgEnrichProcessor', () => {
 
     mockBrightDataOnce(vi.fn(async () => []));
     mockQualifierOnce(vi.fn());
-    const p = new IgEnrichProcessor();
+    const p = new IgEnrichProcessor(mkQueueService());
 
     await p.process(mkJob({ candidateId: 'c1' }));
     expect(prisma.igCandidateProfile.update).toHaveBeenCalledWith({
@@ -152,7 +157,7 @@ describe('IgEnrichProcessor', () => {
     mockQualifierOnce(qualify);
     (prisma.knownAdvertiser.findFirst as any).mockResolvedValueOnce({ id: 'k1' });
 
-    const p = new IgEnrichProcessor();
+    const p = new IgEnrichProcessor(mkQueueService());
     await p.process(mkJob({ candidateId: 'c1' }));
 
     expect(prisma.igCandidateProfile.update).toHaveBeenCalledWith({
@@ -193,7 +198,7 @@ describe('IgEnrichProcessor', () => {
       .mockResolvedValueOnce(null) // by handle
       .mockResolvedValueOnce({ id: 'k2' }); // by domain
 
-    const p = new IgEnrichProcessor();
+    const p = new IgEnrichProcessor(mkQueueService());
     await p.process(mkJob({ candidateId: 'c1' }));
 
     expect(prisma.igCandidateProfile.update).toHaveBeenCalledWith({
@@ -243,12 +248,13 @@ describe('IgEnrichProcessor', () => {
     }));
     mockQualifierOnce(qualify);
 
-    const p = new IgEnrichProcessor();
+    const p = new IgEnrichProcessor(mkQueueService());
     await p.process(mkJob({ candidateId: 'c1' }));
 
     expect(prisma.knownAdvertiser.create).toHaveBeenCalledWith({
       data: expect.objectContaining({
         instagramHandle: 'somehandle',
+        enrichmentStatus: 'PENDING',
         aiQualificationReason: 'ok',
         aiQualificationCategory: 'coach',
         aiQualificationConfidence: 'high',
@@ -257,6 +263,7 @@ describe('IgEnrichProcessor', () => {
         aiUrlFetchSucceeded: true,
         aiInferredCountry: 'US',
       }),
+      select: { id: true },
     });
     expect(prisma.igCandidateProfile.update).toHaveBeenCalledWith({
       where: { id: 'c1' },
@@ -305,7 +312,7 @@ describe('IgEnrichProcessor', () => {
     }));
     mockQualifierOnce(qualify);
 
-    const p = new IgEnrichProcessor();
+    const p = new IgEnrichProcessor(mkQueueService());
     await p.process(mkJob({ candidateId: 'c1' }));
     expect(prisma.knownAdvertiser.create).not.toHaveBeenCalled();
     expect(prisma.igCandidateProfile.update).toHaveBeenCalledWith({
@@ -347,7 +354,7 @@ describe('IgEnrichProcessor', () => {
     });
     mockQualifierOnce(qualify);
 
-    const p = new IgEnrichProcessor();
+    const p = new IgEnrichProcessor(mkQueueService());
     await p.process(mkJob({ candidateId: 'c1' }));
     expect(prisma.igCandidateProfile.update).toHaveBeenCalledWith({
       where: { id: 'c1' },
@@ -398,7 +405,7 @@ describe('IgEnrichProcessor', () => {
 
     (prisma.knownAdvertiser.create as any).mockRejectedValue(new Error('Unique constraint'));
 
-    const p = new IgEnrichProcessor();
+    const p = new IgEnrichProcessor(mkQueueService());
     await p.process(mkJob({ candidateId: 'c1' }));
     expect(prisma.igCandidateProfile.update).toHaveBeenCalledWith({
       where: { id: 'c1' },
@@ -448,7 +455,7 @@ describe('IgEnrichProcessor', () => {
     }));
     mockQualifierOnce(qualify);
 
-    const p = new IgEnrichProcessor();
+    const p = new IgEnrichProcessor(mkQueueService());
     await p.process(mkJob({ candidateId: 'c1' }));
 
     expect(prisma.knownAdvertiser.create).not.toHaveBeenCalled();
@@ -500,13 +507,15 @@ describe('IgEnrichProcessor', () => {
     }));
     mockQualifierOnce(qualify);
 
-    const p = new IgEnrichProcessor();
+    const p = new IgEnrichProcessor(mkQueueService());
     await p.process(mkJob({ candidateId: 'c1' }));
 
     expect(prisma.knownAdvertiser.create).toHaveBeenCalledWith({
       data: expect.objectContaining({
+        enrichmentStatus: 'PENDING',
         aiInferredCountry: null,
       }),
+      select: { id: true },
     });
   });
 });

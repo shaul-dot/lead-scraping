@@ -6,6 +6,8 @@ import { BrightDataClient, type BrightDataInstagramProfile } from '@hyperscale/a
 import { IgCoachQualifier } from '@hyperscale/adapters/qualification/qualifier-ig';
 import { normalizeInstagramHandle } from '@hyperscale/adapters/utils/normalize-platform-handles';
 import { createLogger } from '../common/logger';
+import { QueueService } from '../queues/queue.service';
+import { EMAIL_ENRICHMENT_QUEUE } from '../enrichment/email-enrichment.processor';
 import Anthropic from '@anthropic-ai/sdk';
 import { ExaLandingPageFetcher } from '@hyperscale/adapters/qualification';
 import { normalizeDomain } from '@hyperscale/adapters/utils/normalize-domain';
@@ -31,7 +33,7 @@ export class IgEnrichProcessor extends WorkerHost {
   private brightData: BrightDataClient | null = null;
   private qualifier: IgCoachQualifier | null = null;
 
-  constructor() {
+  constructor(private readonly queueService: QueueService) {
     super();
   }
 
@@ -230,7 +232,7 @@ export class IgEnrichProcessor extends WorkerHost {
       >;
 
       try {
-        await prisma.knownAdvertiser.create({
+        const created = await prisma.knownAdvertiser.create({
           data: {
             companyName: businessName,
             fullName: personName,
@@ -242,7 +244,7 @@ export class IgEnrichProcessor extends WorkerHost {
             addedBy: 'AI',
             addedDate: new Date(),
             leadSource: 'IG',
-            enrichmentStatus: 'NEEDS_ENRICHMENT',
+            enrichmentStatus: 'PENDING',
             sourceKeyword: null,
             instagramHandle: normalizedHandle,
             discoveryChannel: candidate.discoveryChannel,
@@ -266,7 +268,19 @@ export class IgEnrichProcessor extends WorkerHost {
             businessEmail: profile.email_address ?? null,
             rawProfileMetadata: rawProfileForStorage as Prisma.InputJsonValue,
           },
+          select: { id: true },
         });
+
+        try {
+          await this.queueService.addJob(EMAIL_ENRICHMENT_QUEUE, {
+            knownAdvertiserId: created.id,
+          });
+        } catch (e) {
+          logger.warn(
+            { err: e, knownAdvertiserId: created.id },
+            'Failed to enqueue email enrichment job (non-fatal)',
+          );
+        }
 
         logger.info(
           { candidateId, handle: normalizedHandle, stage: qualifierResult.stage },

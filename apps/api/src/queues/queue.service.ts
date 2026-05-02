@@ -35,6 +35,7 @@ export class QueueService {
     @InjectQueue('keyword-score') private keywordScore: Queue,
     @InjectQueue('stats-rollup') private statsRollup: Queue,
     @InjectQueue('qualify') private qualify: Queue,
+    @InjectQueue('email-enrichment') private emailEnrichment: Queue,
   ) {
     this.queues.set('scrape-facebook', scrapeFb);
     this.queues.set('scrape-instagram', scrapeIg);
@@ -61,6 +62,7 @@ export class QueueService {
     this.queues.set('keyword-score', keywordScore);
     this.queues.set('stats-rollup', statsRollup);
     this.queues.set('qualify', qualify);
+    this.queues.set('email-enrichment', emailEnrichment);
   }
 
   private getQueue(name: string): Queue {
