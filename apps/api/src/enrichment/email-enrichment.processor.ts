@@ -5,6 +5,7 @@ import { prisma } from '@hyperscale/database';
 import { createLogger } from '../common/logger';
 import { mineBioText } from './stages/stage-0-bio-mining';
 import { scrapeSite } from './stages/stage-1-site-scrape';
+import { resolveLinktree, type Stage2Result } from './stages/stage-2-linktree-resolver';
 import { classifyEmailType, generatePatternGuesses } from './stages/stage-5-pattern-guesses';
 
 const logger = createLogger('email-enrichment-processor');
@@ -52,6 +53,7 @@ export class EmailEnrichmentProcessor extends WorkerHost {
         firstName: true,
         fullName: true,
         websiteDomain: true,
+        landingPageUrl: true,
       },
     });
 
@@ -85,7 +87,42 @@ export class EmailEnrichmentProcessor extends WorkerHost {
       });
     }
 
-    const effectiveDomain = lead.websiteDomain ?? stage0.promotedDomain;
+    // Stage 2: Linktree resolver — only runs if we have a landingPageUrl that's
+    // a platform domain (linktr.ee, beacons.ai, etc.) AND we don't already have
+    // a websiteDomain. Resolves the real personal domain from the linktree page.
+    let stage2: Stage2Result | null = null;
+    if (lead.landingPageUrl && !lead.websiteDomain && !stage0.promotedDomain) {
+      stage2 = await resolveLinktree(lead.landingPageUrl);
+      logger.info(
+        {
+          knownAdvertiserId,
+          linktreeUrl: lead.landingPageUrl,
+          applicable: stage2.applicable,
+          fetchSucceeded: stage2.fetchSucceeded,
+          candidatesFound: stage2.candidatesFound,
+          resolvedDomain: stage2.resolvedDomain,
+        },
+        'Stage 2 linktree resolution complete',
+      );
+
+      if (stage2.resolvedDomain) {
+        await prisma.knownAdvertiser.update({
+          where: { id: knownAdvertiserId },
+          data: {
+            websiteDomain: stage2.resolvedDomain,
+            websiteUrlOriginal: lead.landingPageUrl,
+            landingPageUrl: stage2.resolvedUrl ?? undefined,
+          },
+        });
+      } else if (stage2.error) {
+        logger.warn(
+          { knownAdvertiserId, linktreeUrl: lead.landingPageUrl, err: stage2.error },
+          'Stage 2 linktree resolution failed',
+        );
+      }
+    }
+
+    const effectiveDomain = lead.websiteDomain ?? stage0.promotedDomain ?? stage2?.resolvedDomain ?? null;
 
     if (effectiveDomain) {
       const stage1 = await scrapeSite(effectiveDomain);
@@ -135,7 +172,6 @@ export class EmailEnrichmentProcessor extends WorkerHost {
       }
     }
 
-    // TODO: Stage 2 (linktree resolver) — Brief 5
     // TODO: Stage 3a/3b (Google SERP) — Brief 6
     // TODO: Stage 4 (Snov) — Brief 7
     // TODO: Stage 6 (Apify IG scraper) — Brief 8
