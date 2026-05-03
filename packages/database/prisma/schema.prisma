@@ -319,6 +319,36 @@ model KnownAdvertiser {
   businessEmail        String?
   rawProfileMetadata   Json?
 
+  // Found emails — numbered per source. Stage 0 (bio), Stage 1 (site),
+  // Stage 3b (SERP), Stage 4 (Snov). Single string per cell, no comma-separated.
+  emailFromBio               String?
+  emailFromSite1             String?
+  emailFromSite2             String?
+  emailFromSite3             String?
+  emailFromSerp1             String?
+  emailFromSerp2             String?
+  emailFromSerp3             String?
+  emailFromSnov1             String?
+  emailFromSnov2             String?
+  emailFromSnov3             String?
+  emailFromSnov4             String?
+  emailFromSnov5             String?
+
+  // The pipeline's chosen "best" email — populated by emailPrimary picker
+  // logic at the end of enrichment. Can be manually overridden by VAs.
+  emailPrimary               String?
+
+  // Pattern guess emails — Stage 5. Always derivable from name + domain.
+  // Excluded from emailPrimary picker (guesses are unverified).
+  emailGuessFirstname        String?
+  emailGuessFirstnameDotLast String?
+  emailGuessFirstnameLast    String?
+  emailGuessFirstinitialLast String?
+  emailGuessAdmin            String?
+  emailGuessInfo             String?
+  emailGuessHello            String?
+  emailGuessContact          String?
+
   lastTraversedAt    DateTime?
 
   leadEmails         LeadEmail[]

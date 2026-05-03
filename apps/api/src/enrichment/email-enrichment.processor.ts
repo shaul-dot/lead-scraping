@@ -13,6 +13,7 @@ import { discoverDomain, type Stage3aResult } from './stages/stage-3a-domain-dis
 import { discoverEmails } from './stages/stage-3b-email-discovery';
 import { searchSnovDomain } from './stages/stage-4-snov';
 import { classifyEmailType, generatePatternGuesses } from './stages/stage-5-pattern-guesses';
+import { syncEmailColumnsForLead } from './derive-email-columns';
 
 const logger = createLogger('email-enrichment-processor');
 
@@ -314,6 +315,10 @@ export class EmailEnrichmentProcessor extends WorkerHost {
     }
 
     // TODO: Stage 6 (Apify IG scraper) — Brief 8
+
+    // After all stages have run, sync the LeadEmail rows into the new
+    // per-source columns and pick the primary email.
+    await syncEmailColumnsForLead(knownAdvertiserId);
 
     await prisma.knownAdvertiser.update({
       where: { id: knownAdvertiserId },
