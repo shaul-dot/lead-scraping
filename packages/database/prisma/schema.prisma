@@ -92,6 +92,26 @@ enum EnrichmentStatus {
   NO_EMAIL_FOUND
 }
 
+enum VerificationStatus {
+  PENDING
+  IN_PROGRESS
+  COMPLETED
+  FAILED
+}
+
+enum EmailVerificationStatus {
+  PENDING
+  VALID
+  INVALID
+  RISKY
+  UNKNOWN
+}
+
+enum VerificationService {
+  NEVERBOUNCE
+  BOUNCEBAN
+}
+
 enum EmailSource {
   BIO_TEXT
   SITE_SCRAPE
@@ -344,6 +364,19 @@ model KnownAdvertiser {
   // logic at the end of enrichment. Can be manually overridden by VAs.
   emailPrimary               String?
 
+  // Stream B: NeverBounce + Bounceban cascade; top 3 verified addresses.
+  verificationStatus       VerificationStatus  @default(PENDING)
+  verificationStartedAt    DateTime?
+  verificationCompletedAt  DateTime?
+  verifiedEmailCount       Int                 @default(0)
+  emailVerifiedPrimary     String?
+  emailVerifiedSecondary   String?
+  emailVerifiedTertiary    String?
+
+  // Personalization placeholder (future phase)
+  leadMagnet               String?
+  personalizedAt           DateTime?
+
   // Pattern guess emails — Stage 5. Always derivable from name + domain.
   // Excluded from emailPrimary picker (guesses are unverified).
   emailGuessFirstname        String?
@@ -371,6 +404,8 @@ model KnownAdvertiser {
   @@index([skoolHandle])
   @@index([discoveryChannel])
   @@index([aiQualificationCategory])
+  @@index([verificationStatus])
+  @@index([enrichmentStatus, verificationStatus])
 }
 
 model LeadEmail {
@@ -383,11 +418,32 @@ model LeadEmail {
   sourceDetail  String?
   emailType     EmailType       @default(UNKNOWN)
 
+  verificationStatus EmailVerificationStatus?
+  verifiedAt         DateTime?
+
   createdAt     DateTime        @default(now())
+
+  verifications EmailVerification[]
 
   @@unique([leadId, address])
   @@index([leadId])
   @@index([address])
+}
+
+model EmailVerification {
+  id          String                  @id @default(cuid())
+  leadEmailId String
+  leadEmail   LeadEmail               @relation(fields: [leadEmailId], references: [id], onDelete: Cascade)
+
+  service     VerificationService
+  resultCode  String
+  status      EmailVerificationStatus
+  rawResponse Json?
+  verifiedAt  DateTime                @default(now())
+  creditsCost Int?
+
+  @@index([leadEmailId])
+  @@index([service, verifiedAt])
 }
 
 model IgCandidateProfile {
