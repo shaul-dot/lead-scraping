@@ -5,6 +5,7 @@ import Anthropic from '@anthropic-ai/sdk';
 import { prisma } from '@hyperscale/database';
 import { BrightDataClient } from '@hyperscale/adapters';
 import { SnovClient } from '@hyperscale/snov';
+import type { ApifyClient } from 'apify-client';
 import { createLogger } from '../common/logger';
 import { mineBioText } from './stages/stage-0-bio-mining';
 import { scrapeSite } from './stages/stage-1-site-scrape';
@@ -14,6 +15,7 @@ import { discoverEmails } from './stages/stage-3b-email-discovery';
 import { searchSnovDomain } from './stages/stage-4-snov';
 import { classifyEmailType, generatePatternGuesses } from './stages/stage-5-pattern-guesses';
 import { syncEmailColumnsForLead } from './derive-email-columns';
+import { scrapeIgProfileEmails } from './stages/stage-6-apify-ig';
 
 const logger = createLogger('email-enrichment-processor');
 
@@ -39,6 +41,7 @@ export class EmailEnrichmentProcessor extends WorkerHost {
     @Inject('BRIGHT_DATA_CLIENT') private readonly brightData: BrightDataClient | null,
     @Inject('ANTHROPIC_CLIENT') private readonly anthropic: Anthropic | null,
     @Inject('SNOV_CLIENT') private readonly snovClient: SnovClient | null,
+    @Inject('APIFY_CLIENT') private readonly apifyClient: ApifyClient | null,
   ) {
     super();
   }
@@ -66,6 +69,7 @@ export class EmailEnrichmentProcessor extends WorkerHost {
         websiteDomain: true,
         landingPageUrl: true,
         aiNiche: true,
+        instagramHandle: true,
       },
     });
 
@@ -297,6 +301,50 @@ export class EmailEnrichmentProcessor extends WorkerHost {
       }
     }
 
+    // Stage 6: Apify IG profile email scraper.
+    const stage6ShouldRun =
+      this.apifyClient !== null && Boolean(lead.instagramHandle) && !effectiveDomain;
+
+    if (stage6ShouldRun) {
+      const existingEmailCount = await prisma.leadEmail.count({
+        where: { leadId: knownAdvertiserId },
+      });
+
+      if (existingEmailCount === 0) {
+        const stage6 = await scrapeIgProfileEmails(this.apifyClient, lead.instagramHandle!);
+
+        logger.info(
+          {
+            knownAdvertiserId,
+            handle: lead.instagramHandle,
+            runSucceeded: stage6.runSucceeded,
+            emailsFound: stage6.emails.length,
+          },
+          'Stage 6 Apify IG email scrape complete',
+        );
+
+        if (stage6.emails.length > 0) {
+          await prisma.leadEmail.createMany({
+            data: stage6.emails.map((address) => ({
+              leadId: knownAdvertiserId,
+              address,
+              source: 'APIFY_IG_SCRAPER',
+              sourceDetail: 'profile',
+              emailType: classifyEmailType(address),
+            })),
+            skipDuplicates: true,
+          });
+        }
+
+        if (stage6.error) {
+          logger.warn(
+            { knownAdvertiserId, handle: lead.instagramHandle, err: stage6.error },
+            'Stage 6 Apify IG scrape error',
+          );
+        }
+      }
+    }
+
     if (effectiveDomain) {
       const lastName = deriveLastName(lead.fullName, lead.firstName);
       const guesses = generatePatternGuesses(lead.firstName, lastName, effectiveDomain);
@@ -313,8 +361,6 @@ export class EmailEnrichmentProcessor extends WorkerHost {
         });
       }
     }
-
-    // TODO: Stage 6 (Apify IG scraper) — Brief 8
 
     // After all stages have run, sync the LeadEmail rows into the new
     // per-source columns and pick the primary email.

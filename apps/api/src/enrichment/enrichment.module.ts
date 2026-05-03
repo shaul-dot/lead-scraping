@@ -1,5 +1,6 @@
 import { Module } from '@nestjs/common';
 import Anthropic from '@anthropic-ai/sdk';
+import { ApifyClient } from 'apify-client';
 import { BrightDataClient } from '@hyperscale/adapters';
 import { SnovClient } from '@hyperscale/snov';
 import { QueueModule } from '../queues/queue.module';
@@ -43,6 +44,17 @@ import { EmailEnrichmentProcessor } from './email-enrichment.processor';
           return null;
         }
         return new SnovClient(userId, secret);
+      },
+    },
+    {
+      provide: 'APIFY_CLIENT',
+      useFactory: () => {
+        const token = process.env.APIFY_TOKEN;
+        if (!token) {
+          console.warn('[EnrichmentModule] APIFY_TOKEN not set — Stage 6 will be skipped');
+          return null;
+        }
+        return new ApifyClient({ token });
       },
     },
     EnrichmentService,

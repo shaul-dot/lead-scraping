@@ -23,6 +23,7 @@ const PATTERN_TO_COLUMN: Record<string, string> = {
  *
  * Caps:
  * - emailFromBio: 1 (any extras beyond first are dropped)
+ * - emailFromIg: up to 2 (Stage 6 Apify)
  * - emailFromSite: up to 3
  * - emailFromSerp: up to 3
  * - emailFromSnov: up to 5
@@ -31,6 +32,8 @@ const PATTERN_TO_COLUMN: Record<string, string> = {
 export function buildEmailColumnUpdate(leadEmails: LeadEmail[]): Record<string, string | null> {
   const update: Record<string, string | null> = {
     emailFromBio: null,
+    emailFromIg1: null,
+    emailFromIg2: null,
     emailFromSite1: null,
     emailFromSite2: null,
     emailFromSite3: null,
@@ -57,9 +60,14 @@ export function buildEmailColumnUpdate(leadEmails: LeadEmail[]): Record<string, 
   const serpEmails = leadEmails.filter((e) => e.source === 'GOOGLE_SERP');
   const snovEmails = leadEmails.filter((e) => e.source === 'SNOV');
   const guessEmails = leadEmails.filter((e) => e.source === 'GUESS');
+  const igEmails = leadEmails.filter((e) => e.source === 'APIFY_IG_SCRAPER');
 
   // Bio: take first only (Stage 0 typically returns 1).
   if (bioEmails[0]) update.emailFromBio = bioEmails[0].address;
+
+  // Stage 6 Apify IG: up to 2.
+  if (igEmails[0]) update.emailFromIg1 = igEmails[0].address;
+  if (igEmails[1]) update.emailFromIg2 = igEmails[1].address;
 
   // Site: up to 3.
   if (siteEmails[0]) update.emailFromSite1 = siteEmails[0].address;
@@ -92,7 +100,7 @@ export function buildEmailColumnUpdate(leadEmails: LeadEmail[]): Record<string, 
 
 /**
  * Picks the primary email from the per-source columns based on priority:
- * bio > site1 > snov1 > site2 > snov2 > site3 > snov3 > snov4 > snov5
+ * bio > ig1 > ig2 > site1 > snov1 > site2 > snov2 > site3 > snov3 > snov4 > snov5
  *  > serp1 > serp2 > serp3.
  *
  * Skips role-type emails (admin/info/hello/contact) unless nothing else exists.
@@ -111,6 +119,8 @@ export function pickEmailPrimary(columns: Record<string, string | null>): string
 
   const priorityOrder = [
     'emailFromBio',
+    'emailFromIg1',
+    'emailFromIg2',
     'emailFromSite1',
     'emailFromSnov1',
     'emailFromSite2',

@@ -83,6 +83,9 @@ importers:
       '@swc/core':
         specifier: ^1.15.26
         version: 1.15.26
+      apify-client:
+        specifier: ^2.11.0
+        version: 2.23.0
       bullmq:
         specifier: ^5.34.0
         version: 5.74.1

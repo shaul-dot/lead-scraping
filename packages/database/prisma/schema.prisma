@@ -322,6 +322,12 @@ model KnownAdvertiser {
   // Found emails — numbered per source. Stage 0 (bio), Stage 1 (site),
   // Stage 3b (SERP), Stage 4 (Snov). Single string per cell, no comma-separated.
   emailFromBio               String?
+
+  // Stage 6: Apify IG email scraper. Targets IG profiles where Bright Data
+  // didn't return a bio email but Apify finds one in bio + business contact. Cap 2.
+  emailFromIg1               String?
+  emailFromIg2               String?
+
   emailFromSite1             String?
   emailFromSite2             String?
   emailFromSite3             String?
