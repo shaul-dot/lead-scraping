@@ -51,18 +51,10 @@ export class EmailEnrichmentProcessor extends WorkerHost {
 
     logger.info({ knownAdvertiserId, jobId: job.id }, 'Starting email enrichment');
 
-    await prisma.knownAdvertiser.update({
-      where: { id: knownAdvertiserId },
-      data: {
-        enrichmentStatus: 'IN_PROGRESS',
-        enrichmentStartedAt: new Date(),
-        enrichmentAttempts: { increment: 1 },
-      },
-    });
-
     const lead = await prisma.knownAdvertiser.findUnique({
       where: { id: knownAdvertiserId },
       select: {
+        discoveryChannel: true,
         biography: true,
         firstName: true,
         fullName: true,
@@ -74,8 +66,38 @@ export class EmailEnrichmentProcessor extends WorkerHost {
     });
 
     if (!lead) {
-      throw new Error(`KnownAdvertiser not found: ${knownAdvertiserId}`);
+      logger.warn({ knownAdvertiserId }, `Lead ${knownAdvertiserId} not found, skipping`);
+      return;
     }
+
+    // Defensive guard: legacy leads (null discoveryChannel) are historical
+    // dedup-reference data only. They must NEVER be processed by enrichment.
+    // Even if a job for one somehow gets enqueued, refuse to process.
+    if (!lead.discoveryChannel) {
+      logger.warn(
+        { knownAdvertiserId },
+        'Refusing to enrich legacy lead with null discoveryChannel',
+      );
+      // Mark as completed with a clear status so we don't retry.
+      await prisma.knownAdvertiser.update({
+        where: { id: knownAdvertiserId },
+        data: {
+          enrichmentStatus: 'NO_EMAIL_FOUND',
+          enrichmentLastError: 'Skipped: legacy lead, dedup-reference only',
+          enrichmentCompletedAt: new Date(),
+        },
+      });
+      return;
+    }
+
+    await prisma.knownAdvertiser.update({
+      where: { id: knownAdvertiserId },
+      data: {
+        enrichmentStatus: 'IN_PROGRESS',
+        enrichmentStartedAt: new Date(),
+        enrichmentAttempts: { increment: 1 },
+      },
+    });
 
     const hadWebsiteDomain = Boolean(lead.websiteDomain);
     const stage0 = mineBioText(lead.biography, hadWebsiteDomain);
