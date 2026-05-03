@@ -29,7 +29,8 @@ export type QueueName =
   | 'keyword-score'
   | 'stats-rollup'
   | 'qualify'
-  | 'email-enrichment';
+  | 'email-enrichment'
+  | 'verification';
 
 export type QueueJobData =
   | { queue: 'scrape-facebook'; data: ScrapeJobInput }
@@ -57,4 +58,5 @@ export type QueueJobData =
   | { queue: 'keyword-score'; data: { keyword: string; source: string } }
   | { queue: 'stats-rollup'; data: { date: string } }
   | { queue: 'qualify'; data: { advertiserId: string } }
-  | { queue: 'email-enrichment'; data: { knownAdvertiserId: string } };
+  | { queue: 'email-enrichment'; data: { knownAdvertiserId: string } }
+  | { queue: 'verification'; data: { knownAdvertiserId: string } };

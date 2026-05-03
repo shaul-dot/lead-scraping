@@ -28,6 +28,7 @@ import { SettingsModule } from './settings/settings.module';
 import { ManualReviewModule } from './manual-review/manual-review.module';
 import { QaModule } from './qa/qa.module';
 import { QualificationModule } from './qualification/qualification.module';
+import { VerificationModule } from './verification/verification.module';
 
 @Module({
   imports: [
@@ -68,6 +69,7 @@ import { QualificationModule } from './qualification/qualification.module';
     ManualReviewModule,
     QaModule,
     QualificationModule,
+    VerificationModule,
   ],
 })
 export class AppModule {}
