@@ -20,6 +20,8 @@
     "@hyperscale/remediation": "workspace:*",
     "@hyperscale/sessions": "workspace:*",
     "@hyperscale/snov": "workspace:*",
+    "@hyperscale/neverbounce": "workspace:*",
+    "@hyperscale/bounceban": "workspace:*",
     "@hyperscale/types": "workspace:*",
     "@nestjs/bullmq": "^11.0.0",
     "@nestjs/common": "^11.0.0",
